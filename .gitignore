@@ -1,0 +1,19 @@
+# Python cache / environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Browser test artifacts
+playwright-report/
+test-results/
+
+# Inbox is temporary staging; keep only the guide
+inbox/*
+!inbox/README.md

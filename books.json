@@ -1,0 +1,451 @@
+[
+  {
+    "id": 1,
+    "slug": "book-1",
+    "title": "Product Management Mastery",
+    "subtitle": "A Comprehensive Handbook for the AI Era",
+    "chapters": [
+      {
+        "num": 1,
+        "title": "Product Management Fundamentals",
+        "pages": 18
+      },
+      {
+        "num": 2,
+        "title": "Product Thinking and First-Principles Reasoning",
+        "pages": 20
+      },
+      {
+        "num": 3,
+        "title": "User Problem and Discovery Mastery",
+        "pages": 23
+      },
+      {
+        "num": 4,
+        "title": "Product Strategy (APM-Grade)",
+        "pages": 25
+      },
+      {
+        "num": 5,
+        "title": "Ideation, Prioritization and Decision Making",
+        "pages": 23
+      },
+      {
+        "num": 6,
+        "title": "Execution and Delivery Excellence",
+        "pages": 30
+      },
+      {
+        "num": 7,
+        "title": "Product Metrics and Data Thinking",
+        "pages": 24
+      },
+      {
+        "num": 8,
+        "title": "Guesstimates and Structured Problem Solving",
+        "pages": 19
+      },
+      {
+        "num": 9,
+        "title": "UX Design and Product Quality: The PM View",
+        "pages": 25
+      },
+      {
+        "num": 10,
+        "title": "Soft Skills and PM Leadership",
+        "pages": 29
+      },
+      {
+        "num": 11,
+        "title": "Building AI Products: The New Discipline",
+        "pages": 34
+      },
+      {
+        "num": 12,
+        "title": "Product Teardowns: A Library of Deep Case Studies",
+        "pages": 35
+      },
+      {
+        "num": 13,
+        "title": "Go-to-Market, Growth and Monetization",
+        "pages": 23
+      },
+      {
+        "num": 14,
+        "title": "Technical Foundations for PMs",
+        "pages": 24
+      },
+      {
+        "num": 15,
+        "title": "Idea Origination and Building Products from Scratch 0→1",
+        "pages": 21
+      },
+      {
+        "num": 16,
+        "title": "PM-Owned Special Domains",
+        "pages": 16
+      },
+      {
+        "num": 17,
+        "title": "Interview Preparation: Google APM-Grade",
+        "pages": 30
+      },
+      {
+        "num": 18,
+        "title": "Common PM Mistakes and Anti-Patterns",
+        "pages": 13
+      },
+      {
+        "num": 19,
+        "title": "Learning Resources and Practice System",
+        "pages": 16
+      },
+      {
+        "num": 20,
+        "title": "The 6-12 Month Learning and Practice Roadmap + APM Readiness Checklist",
+        "pages": 18
+      },
+      {
+        "num": 21,
+        "title": "Addendum: Gap-Fill Topics",
+        "pages": 13
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "slug": "book-2",
+    "title": "Product Management Mastery, Second Edition",
+    "subtitle": "The Complete Handbook for Early-Career PMs Targeting Top Companies",
+    "chapters": [
+      {
+        "num": 1,
+        "title": "Product Management Fundamentals",
+        "pages": 26
+      },
+      {
+        "num": 2,
+        "title": "Product Thinking and First-Principles Reasoning",
+        "pages": 21
+      },
+      {
+        "num": 3,
+        "title": "User Problem and Discovery Mastery",
+        "pages": 23
+      },
+      {
+        "num": 4,
+        "title": "Product Strategy and Vision",
+        "pages": 22
+      },
+      {
+        "num": 5,
+        "title": "Ideation, Prioritization and Decision Making",
+        "pages": 23
+      },
+      {
+        "num": 6,
+        "title": "Execution and Delivery Excellence",
+        "pages": 18
+      },
+      {
+        "num": 7,
+        "title": "Product Metrics and Data Thinking",
+        "pages": 24
+      },
+      {
+        "num": 8,
+        "title": "Guesstimates and Structured Problem Solving",
+        "pages": 19
+      },
+      {
+        "num": 9,
+        "title": "UX Design and Product Quality: The PM View",
+        "pages": 25
+      },
+      {
+        "num": 10,
+        "title": "Soft Skills and PM Leadership",
+        "pages": 20
+      },
+      {
+        "num": 11,
+        "title": "Building AI Products: The New Discipline",
+        "pages": 34
+      },
+      {
+        "num": 12,
+        "title": "Product Teardowns: A Library of Deep Case Studies",
+        "pages": 34
+      },
+      {
+        "num": 13,
+        "title": "Go-to-Market, Growth and Monetization",
+        "pages": 22
+      },
+      {
+        "num": 14,
+        "title": "Technical Foundations for PMs",
+        "pages": 24
+      },
+      {
+        "num": 15,
+        "title": "Idea Origination and Building Products from Scratch 0→1",
+        "pages": 20
+      },
+      {
+        "num": 16,
+        "title": "PM-Owned Special Domains",
+        "pages": 16
+      },
+      {
+        "num": 17,
+        "title": "Interview Preparation: Google APM-Grade",
+        "pages": 26
+      },
+      {
+        "num": 18,
+        "title": "Common PM Mistakes and Anti-Patterns",
+        "pages": 14
+      },
+      {
+        "num": 19,
+        "title": "Learning Resources and Practice System",
+        "pages": 16
+      },
+      {
+        "num": 20,
+        "title": "12-Month Roadmap: Three Tracks",
+        "pages": 13
+      },
+      {
+        "num": 21,
+        "title": "Addendum: Gap-Fill Topics",
+        "pages": 13
+      },
+      {
+        "num": 22,
+        "title": "The Real World of Big Tech Product Management",
+        "pages": 16
+      },
+      {
+        "num": 23,
+        "title": "Five End-to-End Product Journeys",
+        "pages": 50
+      },
+      {
+        "num": 24,
+        "title": "50+ APM Interview Questions with Rubrics",
+        "pages": 24
+      },
+      {
+        "num": 25,
+        "title": "Resume, Portfolio and Career Capital for Early-Career PMs",
+        "pages": 19
+      },
+      {
+        "num": 26,
+        "title": "The Under-Taught PM Skills",
+        "pages": 14
+      },
+      {
+        "num": 27,
+        "title": "AI-Native Product Management as System Design",
+        "pages": 11
+      },
+      {
+        "num": 28,
+        "title": "Thinking Like a Principal PM",
+        "pages": 10
+      },
+      {
+        "num": 29,
+        "title": "The Career Playbook",
+        "pages": 14
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "slug": "book-3",
+    "title": "The APM Interview Playbook",
+    "subtitle": "A Comprehensive Guide to Product Thinking, Case Interviews, AI Products and Big Tech APM Readiness",
+    "chapters": [
+      {
+        "num": 1,
+        "title": "The APM Role and How This Book Works",
+        "pages": 35
+      },
+      {
+        "num": 2,
+        "title": "Product Thinking and Decision Foundations",
+        "pages": 35
+      },
+      {
+        "num": 3,
+        "title": "Structured Problem Solving: MECE, Issue Trees, Hypotheses",
+        "pages": 40
+      },
+      {
+        "num": 4,
+        "title": "Estimation Under Pressure",
+        "pages": 38
+      },
+      {
+        "num": 5,
+        "title": "Metrics: Choosing, Defining and Reading Them",
+        "pages": 44
+      },
+      {
+        "num": 6,
+        "title": "Users, Problems and Discovery",
+        "pages": 41
+      },
+      {
+        "num": 7,
+        "title": "Product Design: Designing for a User",
+        "pages": 53
+      },
+      {
+        "num": 8,
+        "title": "Improving an Existing Product",
+        "pages": 47
+      },
+      {
+        "num": 9,
+        "title": "New Markets and Underserved Users",
+        "pages": 51
+      },
+      {
+        "num": 10,
+        "title": "UX and Product Quality",
+        "pages": 36
+      },
+      {
+        "num": 11,
+        "title": "Product Critique and Teardown Method",
+        "pages": 38
+      },
+      {
+        "num": 12,
+        "title": "Statistics for PMs",
+        "pages": 43
+      },
+      {
+        "num": 13,
+        "title": "Diagnosing a Metric Change",
+        "pages": 55
+      },
+      {
+        "num": 14,
+        "title": "Experiment Design and Causal Reasoning",
+        "pages": 48
+      },
+      {
+        "num": 15,
+        "title": "Prioritization and Tradeoffs",
+        "pages": 43
+      },
+      {
+        "num": 16,
+        "title": "Specs, Engineering and Design Partnership",
+        "pages": 43
+      },
+      {
+        "num": 17,
+        "title": "Launch, Rollout and Execution Decisions",
+        "pages": 42
+      },
+      {
+        "num": 18,
+        "title": "Strategy at APM Depth",
+        "pages": 45
+      },
+      {
+        "num": 19,
+        "title": "Platforms and Ecosystems",
+        "pages": 42
+      },
+      {
+        "num": 20,
+        "title": "Go-to-Market, Pricing and Growth Basics",
+        "pages": 39
+      },
+      {
+        "num": 21,
+        "title": "How Products Work: Technical Fluency",
+        "pages": 44
+      },
+      {
+        "num": 22,
+        "title": "PM-Level System Design",
+        "pages": 45
+      },
+      {
+        "num": 23,
+        "title": "Machine Learning, Ranking and Recommendation for PMs",
+        "pages": 46
+      },
+      {
+        "num": 24,
+        "title": "AI Product Management: Foundations",
+        "pages": 45
+      },
+      {
+        "num": 25,
+        "title": "AI Product Management: Building, Evaluating and Governing",
+        "pages": 46
+      },
+      {
+        "num": 26,
+        "title": "0→1 and Idea Evaluation",
+        "pages": 35
+      },
+      {
+        "num": 27,
+        "title": "Domain Primers",
+        "pages": 38
+      },
+      {
+        "num": 28,
+        "title": "Teardown Library",
+        "pages": 40
+      },
+      {
+        "num": 29,
+        "title": "Anti-Patterns",
+        "pages": 31
+      },
+      {
+        "num": 30,
+        "title": "Five End-to-End Product Journeys",
+        "pages": 34
+      },
+      {
+        "num": 31,
+        "title": "Behavioral Interviews: Stories That Hold Up",
+        "pages": 47
+      },
+      {
+        "num": 32,
+        "title": "Communication and Influence at APM Level",
+        "pages": 43
+      },
+      {
+        "num": 33,
+        "title": "Interview Loops and Company Lenses",
+        "pages": 46
+      },
+      {
+        "num": 34,
+        "title": "Mock Interviews, Scoring and Calibration",
+        "pages": 44
+      },
+      {
+        "num": 37,
+        "title": "The 12-Month Plan, Readiness Checklist and Your First 90 Days",
+        "pages": 38
+      }
+    ]
+  }
+]

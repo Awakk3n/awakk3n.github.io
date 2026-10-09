@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abhinav | The Product Guy</title>
+<meta name="description" content="Abhinav: product manager focused on user-centric products, UX, data and automation.">
+<meta name="theme-color" content="#060913">
+<link rel="icon" href="assets/favicon-abhinav-round.png" type="image/png" sizes="32x32">
+<script>try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="assets/theme.css">
+<link rel="stylesheet" href="assets/home.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a href="index.html" class="brand">Abhinav<span>.</span></a>
+  <ul class="menu" id="menu">
+    <li><a href="#home" data-sec="home" class="active">Home</a></li>
+    <li><a href="#about" data-sec="about">About</a></li>
+    <li><a href="#projects" data-sec="projects">Projects</a></li>
+    <li><a href="#books" data-sec="books">Books</a></li>
+    <li><a href="#blog" data-sec="blog">Blog</a></li>
+    <li><a href="#contact" data-sec="contact">Contact</a></li>
+  </ul>
+  <div class="nav-tools">
+    <button class="theme-btn" type="button" aria-label="Toggle theme"><i class="fas fa-moon"></i><i class="fas fa-sun"></i></button>
+    <button class="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><i class="fas fa-bars"></i></button>
+  </div>
+</div></header>
+<main>
+<section id="home" class="hero">
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="grid-bg" aria-hidden="true"></div>
+  <div class="wrap hero-inner">
+    <span class="chip reveal"><i class="fas fa-circle"></i> Product Guy &middot; Systems Thinker &middot; Impact-Obsessed</span>
+    <h1 class="reveal" style="--d:.08s">Building products that <span class="grad-text">empower humans.</span></h1>
+    <p class="lead reveal" style="--d:.16s">Engineering ideas into experiences, with structured thinking, creative exploration and a bias for measurable outcomes.</p>
+    <div class="hero-cta reveal" style="--d:.24s">
+      <a href="#projects" class="btn btn-primary">View my work <i class="fas fa-arrow-right"></i></a>
+      <a href="#books" class="btn btn-ghost"><i class="fas fa-book-open"></i> Read the books</a>
+      <a href="#contact" class="btn btn-ghost">Get in touch</a>
+    </div>
+  </div>
+</section>
+
+<section id="about" class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal"><span class="eyebrow">About</span><h2>From curiosity to clarity, one product at a time.</h2></div>
+    <div class="about-grid">
+      <div class="about-text reveal">
+        <p>Hey, I’m Abhinav: a builder at heart, a problem-solver by trade, and a curious mind with a strategist’s clarity. I thrive at the intersection of structured thinking and creative exploration, constantly seeking smarter ways to design, analyze, and optimize the systems around me.</p>
+        <p>Driven by an obsession with growth, I believe in executing with intent and learning with humility. I’m deeply passionate about understanding how things work, not just on the surface but at their core, and translating that insight into meaningful solutions.</p>
+        <p>I see myself as a long-term player: building capabilities today that unlock bigger, better outcomes tomorrow. At my core, I’m relentless, not in a loud way, but through quiet, consistent pursuit of excellence in everything I choose to be part of.</p>
+      </div>
+      <div class="stats reveal" style="--d:.1s">
+        <div class="card stat"><b>15+</b><span>Products Launched</span></div>
+        <div class="card stat"><b>8</b><span>Industry Awards</span></div>
+        <div class="card stat"><b>97%</b><span>User Satisfaction</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="projects" class="sec alt">
+  <div class="wrap">
+    <div class="sec-head reveal"><span class="eyebrow">Projects</span><h2>Featured work</h2><p>Successful products I’ve helped develop and launch.</p></div>
+    <div class="filters reveal" role="group" aria-label="Filter projects">
+      <button class="pill active" data-filter="all">All</button>
+      <button class="pill" data-filter="ux">UX Design</button>
+      <button class="pill" data-filter="data">Data Analytics</button>
+      <button class="pill" data-filter="automation">Automation</button>
+    </div>
+    <div class="grid-3" id="proj-grid">
+      <article class="card proj reveal" data-cat="automation data">
+        <div class="ico"><i class="fas fa-gears"></i></div>
+        <div class="tags"><span>Automation</span><span>Data</span></div>
+        <h3>Alteryx Automation Tool</h3>
+        <p>Automated data ingestion and field mapping in Alteryx workflows, saving 20+ hours/week for the data team.</p>
+        <span class="soon">Case study coming soon</span>
+      </article>
+      <article class="card proj reveal" data-cat="automation ux" style="--d:.08s">
+        <div class="ico"><i class="fas fa-diagram-project"></i></div>
+        <div class="tags"><span>Automation</span><span>UX</span></div>
+        <h3>Power Automate Flow Set</h3>
+        <p>Built a set of approval flows with adaptive cards, reducing approval time from 48h to under 4h.</p>
+        <span class="soon">Case study coming soon</span>
+      </article>
+      <article class="card proj reveal" data-cat="data" style="--d:.16s">
+        <div class="ico"><i class="fas fa-chart-line"></i></div>
+        <div class="tags"><span>Data Analytics</span><span>Visualization</span></div>
+        <h3>Loan Analytics Dashboard</h3>
+        <p>Interactive dashboard tracking credit trends using Python, SQL, and Excel, adopted by 3 stakeholder teams.</p>
+        <span class="soon">Case study coming soon</span>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="books" class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal"><span class="eyebrow">Books</span><h2>Product management handbooks</h2><p>Read every chapter in the browser. Listen where an audiobook exists.</p></div>
+    <div class="grid-3" id="home-books"></div>
+    <p class="center reveal"><a href="books/index.html" class="btn btn-ghost">All books <i class="fas fa-arrow-right"></i></a></p>
+  </div>
+</section>
+
+<section id="blog" class="sec alt">
+  <div class="wrap">
+    <div class="sec-head reveal"><span class="eyebrow">Writing</span><h2>Latest articles</h2><p>Thoughts on product management, UX and data.</p></div>
+    <div class="grid-3" id="home-posts"></div>
+  </div>
+</section>
+
+<section id="contact" class="sec">
+  <div class="wrap">
+    <div class="sec-head reveal"><span class="eyebrow">Contact</span><h2>Let’s connect</h2><p>Have a project in mind or want to discuss product strategy?</p></div>
+    <div class="contact-grid">
+      <div class="contact-info reveal">
+        <div class="cm"><div class="ci"><i class="fas fa-envelope"></i></div><div><h4>Email</h4><a href="mailto:info.abhinav.here@gmail.com">info.abhinav.here@gmail.com</a></div></div>
+        <div class="cm"><div class="ci"><i class="fas fa-phone"></i></div><div><h4>Phone</h4><span>+1 (555) 123-4567</span></div></div>
+        <div class="cm"><div class="ci"><i class="fas fa-location-dot"></i></div><div><h4>Location</h4><span>San Francisco, CA</span></div></div>
+      </div>
+      <form class="card contact-form reveal" id="contact-form" style="--d:.1s">
+        <label>Name<input type="text" name="name" required autocomplete="name"></label>
+        <label>Email<input type="email" name="email" required autocomplete="email"></label>
+        <label>Subject<input type="text" name="subject" required></label>
+        <label>Message<textarea name="message" required></textarea></label>
+        <button type="submit" class="btn btn-primary">Send message <i class="fas fa-paper-plane"></i></button>
+      </form>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="footer"><div class="wrap">
+  <div class="foot-grid">
+    <div><h4>Abhinav</h4><p>Associate Product Manager focused on creating user-centric digital experiences that solve real problems and deliver measurable business value.</p></div>
+    <div><h4>Explore</h4><ul>
+      <li><a href="#books" data-sec="books">Books</a></li>
+      <li><a href="Product-Management/UX-Discussion/Principle-of-User-Autonomy.html">UX Design Principles</a></li>
+      <li><a href="index.html#contact">Contact</a></li></ul></div>
+    <div><h4>Connect</h4><div class="socials">
+      <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+      <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+      <a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a>
+      <a href="#" aria-label="Medium"><i class="fab fa-medium-m"></i></a></div></div>
+  </div>
+  <div class="foot-bottom">© 2025 Abhinav. All rights reserved.</div>
+</div></footer>
+<script src="assets/books-data.js"></script>
+<script src="assets/posts-data.js"></script>
+<script src="assets/site.js"></script>
+<script src="assets/particles.js"></script>
+<script src="assets/home.js"></script>
+</body></html>
