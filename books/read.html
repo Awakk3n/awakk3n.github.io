@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reader | Abhinav</title>
+<meta name="description" content="Read a chapter.">
+<meta name="theme-color" content="#060913">
+<link rel="icon" href="../assets/favicon-abhinav-round.png" type="image/png" sizes="32x32">
+<script>try{var t=localStorage.getItem('theme');if(!t)t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="../assets/theme.css">
+<link rel="stylesheet" href="../assets/books.css">
+</head>
+<body class="books">
+<header class="nav"><div class="wrap">
+  <a href="../index.html" class="brand">Abhinav<span>.</span></a>
+  <ul class="menu" id="menu">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#about">About</a></li>
+    <li><a href="../index.html#projects">Projects</a></li>
+    <li><a href="../index.html#books" class="active">Books</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+    <li><a href="../index.html#contact">Contact</a></li>
+  </ul>
+  <div class="nav-tools">
+    <button class="theme-btn" type="button" aria-label="Toggle theme"><i class="fas fa-moon"></i><i class="fas fa-sun"></i></button>
+    <button class="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu"><i class="fas fa-bars"></i></button>
+  </div>
+</div></header>
+<main class="wrap reader">
+  <nav class="crumbs" id="crumbs"></nav>
+  <h1 class="r-title" id="r-title">Loading</h1>
+  <section class="audio card" id="audio" hidden>
+    <audio id="player" preload="metadata"></audio>
+    <div class="ap">
+      <div class="ap-top">
+        <span class="ap-label"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 3a9 9 0 0 0-9 9v6a3 3 0 0 0 3 3h1v-8H5v-1a7 7 0 0 1 14 0v1h-2v8h1a3 3 0 0 0 3-3v-6a9 9 0 0 0-9-9z"/></svg> Audiobook</span>
+        <span class="ap-time"><span id="a-cur">0:00</span> / <span id="a-dur">0:00</span></span>
+      </div>
+      <div class="ap-row">
+        <button type="button" id="a-back" class="ap-btn" aria-label="Back 15 seconds" title="Back 15s">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><b>15</b></button>
+        <button type="button" id="a-play" class="ap-btn play" aria-label="Play">
+          <svg class="i-play" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
+        <button type="button" id="a-fwd" class="ap-btn" aria-label="Forward 30 seconds" title="Forward 30s">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg><b>30</b></button>
+        <input type="range" id="a-seek" min="0" max="1000" value="0" step="1" aria-label="Seek">
+        <div class="spd">
+          <button type="button" id="a-speed" class="ap-speed" aria-haspopup="true" aria-expanded="false" aria-label="Playback speed">1×</button>
+          <div class="spd-menu" id="spd-menu" role="menu" hidden></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <p class="muted" id="audio-none" hidden>No audiobook for this chapter yet.</p>
+  <div class="r-layout">
+    <aside class="r-toc" id="r-toc" hidden><h4>On this page</h4><ul id="r-toc-list"></ul></aside>
+    <div class="r-main">
+      <div class="pdf-bar">
+        <span class="muted" id="pdf-pp"></span>
+        <a class="btn btn-ghost btn-sm" id="pdf-dl" download><i class="fas fa-download"></i> Download PDF</a>
+      </div>
+      <article class="prose" id="prose"><p class="muted">Loading chapter</p></article>
+      <iframe class="pdf-frame" id="pdf-frame" title="PDF" hidden></iframe>
+      <nav class="ch-nav" id="ch-nav"></nav>
+    </div>
+  </div>
+</main>
+<footer class="footer"><div class="wrap">
+  <div class="foot-grid">
+    <div><h4>Abhinav</h4><p>Associate Product Manager focused on creating user-centric digital experiences that solve real problems and deliver measurable business value.</p></div>
+    <div><h4>Explore</h4><ul>
+      <li><a href="../index.html#books">Books</a></li>
+      <li><a href="../Product-Management/UX-Discussion/Principle-of-User-Autonomy.html">UX Design Principles</a></li>
+      <li><a href="../index.html#contact">Contact</a></li></ul></div>
+    <div><h4>Connect</h4><div class="socials">
+      <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+      <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+      <a href="#" aria-label="GitHub"><i class="fab fa-github"></i></a>
+      <a href="#" aria-label="Medium"><i class="fab fa-medium-m"></i></a></div></div>
+  </div>
+  <div class="foot-bottom">© 2025 Abhinav. All rights reserved.</div>
+</div></footer>
+<script src="../assets/books-data.js"></script>
+<script src="../assets/site.js"></script>
+<script src="../assets/books.js"></script>
+</body></html>
