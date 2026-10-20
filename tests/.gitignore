@@ -1,0 +1,6 @@
+node_modules/
+# outputs written by the scripts in this folder
+bench-*.json
+lh-*.json
+responsive*.json
+axe*.json
