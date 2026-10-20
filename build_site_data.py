@@ -237,7 +237,7 @@ def build_search_and_practice_data(books: list[dict], labels: dict[str, str]) ->
         search_items.append({
             "kind": "glossary", "title": match.group(2).strip(),
             "subtitle": "Glossary term", "url": "resource.html?resource=glossary#term-" + match.group(1),
-            "text": plain_markdown(section, labels), "book": "Book 3 · Glossary"
+            "text": plain_markdown(section.split("\n", 1)[1] if "\n" in section else section, labels), "book": "Book 3 · Glossary"   # heading line is the title already
         })
 
     frameworks = (RESOURCES_DIR / "06_frameworks_registry.md").read_text(encoding="utf-8-sig")

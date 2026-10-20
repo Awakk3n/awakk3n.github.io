@@ -12,7 +12,8 @@ A static, interactive product-management learning library for GitHub Pages. The 
 
 - `index.html` — collection landing page, chapter-title search, saved chapter list, and shortcuts to full-text search and study tools.
 - `book.html` — one reusable volume index; Book 3 links its four companion resources, with the reading guide placed before the Glossary.
-- `read.html` — chapter reader, reading progress, outline, previous/next navigation, local notes, bookmarks, sharing/copying, printing, and optional inline YouTube audio.
+- `read.html` — chapter reader (`read.html?chapter=book-1-ch-03`): reading progress, outline, previous/next navigation, local notes, bookmarks, sharing/copying, printing, and chapter audio. Chapter text is loaded from the generated `chapters/*.content.js` files.
+- `tests/` — regression checks (functional, responsive, accessibility, particle benchmark, Lighthouse). Not part of the site; see `tests/README.md`.
 - `search.html` — full-text search across chapters, glossary entries, framework records and interview questions.
 - `study.html` — four guided reading paths, timed random interview practice, self-scoring, and learning-data export/import.
 - `books.json` — editable catalogue source.
@@ -20,7 +21,11 @@ A static, interactive product-management learning library for GitHub Pages. The 
 - `assets/audio-links.js` — editable YouTube URL map by chapter ID.
 - `assets/theme-init.js` — runs in `<head>` before first paint: saved choice → system preference → dark. Single source of truth for the theme and the `theme-color` meta.
 - `assets/site.css` — the design system. Section 1 holds every token (colour, type, spacing, radii, motion, z-index, shadows, hero atmosphere) for both themes; nothing below it uses a raw colour value.
-- `assets/particles.js` — particle engine. All tunables live in the `CONFIG` block at the top.
+- `assets/particles.js` — the particle field: one fixed page-wide canvas (ambient depth layer on every page + the hero constellation). All tunables live in the `CONFIG` block at the top.
+- `assets/audio.js` — chapter audio card and YouTube player (see *How chapter audio works*).
+- `assets/fonts/` — self-hosted Archivo, Source Sans 3 and IBM Plex Mono (SIL OFL; licences in `fonts/LICENSES.txt`). No Google Fonts requests.
+- `privacy.html`, `404.html` — privacy / YouTube disclosure (required when playing YouTube embeds) and the GitHub Pages not-found page.
+- `docs/` — engineering audit, implementation log and archived earlier reports.
 - `assets/`, `chapters/`, `resources/` — site assets, 85 original chapter Markdown files plus generated content caches, and four companion Markdown sources plus generated caches.
 - `build_site_data.py` — rebuilds the generated browser caches and search/practice data from Markdown sources.
 - `.nojekyll` — avoids Jekyll processing of Markdown sources.
@@ -31,6 +36,14 @@ A static, interactive product-management learning library for GitHub Pages. The 
 - **Glossary:** 236 terms. `[[term-slug]]` chapter references become links to their glossary entry.
 - **Frameworks Registry:** 249 frameworks, including a core-only filter for 30 core frameworks.
 - **Interview Bank:** 298 questions with search, type/difficulty/company filters, rubrics, and model answers.
+
+## How chapter audio works
+
+Chapters with a mapping in `assets/audio-links.js` show a **Listen to this chapter** card. Nothing is requested from YouTube until the reader presses *Play audio*; the official YouTube player then appears in place (480×270 on desktop, at least 200 px tall on phones). The card remembers where each listener stopped and offers the next chapter when audio ends.
+
+What it deliberately does **not** do — all prohibited by YouTube's API Services policies: hide or shrink the player below 200×200, cover any part of it, separate the audio from the video, or play from an off-screen "background" player. Consequently there is **no lock-screen / background listening**; mobile browsers also pause embedded media when the screen locks. If you need true audiobook behaviour (background play, lock-screen controls), the audio must be hosted by you and played with an `<audio>` element — that is a different architecture from YouTube embedding.
+
+Mobile autoplay: the player iframe is created synchronously inside the tap, with `allow="autoplay"` present at creation, which is what iOS Safari and Android Chrome require. If a browser still blocks autoplay, the card tells the reader to press play inside the player.
 
 ## Audio mappings
 
@@ -49,13 +62,13 @@ Bookmarks, reading progress, personal chapter notes and practice scores are save
 ## Update chapters or companion files
 
 1. Edit the corresponding `.md` source in `chapters/` or `resources/`.
-2. For a new chapter, update `books.json` with a unique ID, title, file path, and reader URL.
+2. For a new chapter, update `books.json` with a unique ID, title, label, file path and reader URL (`read.html?chapter=<id>`).
 3. Run `python build_site_data.py` (requires `markdown-it-py`). Output is deterministic, so a rebuild with unchanged sources produces no diff.
 4. Confirm the builder reports 3 books, 85 chapters, and 4 resources—or the updated counts if you intentionally added content—then test `index.html`, `search.html`, `study.html`, representative reader pages, and all resource pages before publishing.
 
 ## Design and accessibility
 
-- The connected particle field is interactive: pointer movement nudges nearby nodes, and clicking the canvas adds a local burst without rebuilding the established network or kicking ambient nodes. Burst nodes expire cleanly, density adapts to screen size, and the field pauses off-screen while respecting `prefers-reduced-motion`.
+- The particle field is **Reveal**: a calm field of drifting points where the network only exists where light falls — under the cursor or finger, on three slow wandering beams, and on a volume you hover (or whose page you are on). One fixed canvas sits behind every page (`pointer-events: none`, so it never blocks clicks, selection or scrolling). The hero is full strength; the body is the same field, very translucent (weaker still on chapter pages). A small soft glow follows the cursor, as before. A tap or click in the hero is random: it can create particles, push them away, or destroy some (more likely where it is crowded), and destroyed particles slowly regrow, so the load always settles. Every particle has its own speed and character and random gusts pass through, so the motion never loops or restarts. Counts are bounded (hard cap, capped links per particle). `prefers-reduced-motion` gives one still image.
 - Light and dark are separate token sets (not an inversion); the choice is persisted only when the reader toggles it, and until then the page follows the operating system live. Accent text meets WCAG AA in both themes.
 - A skip-to-content link is the first tab stop on every page.
 - Keyboard focus states, `/` to focus the active search, mobile-responsive reading layouts, accessible audio fallback, print stylesheet, and no embedded autoplay until the reader selects Play.
@@ -75,7 +88,7 @@ Bookmarks, chapter notes, read progress, last-opened chapter and practice scores
 ## Recent interface refinements
 
 - Desktop hero banners share a 594px baseline; tablet and phone layouts share a 490px baseline and can grow naturally when narrow text wraps.
-- The particle network uses per-visit randomized constellations, higher responsive density, curved cross-cluster links, bright signal trails, pointer repulsion and click-to-multiply bursts. It pauses outside the visible hero and respects reduced-motion preferences.
+- The particle field boots after the page has loaded (so first paint is never competing with it) and fades in. The original icon set (☼ ◐ ★ ☆ ↗ ↘ ↑ ← → ⌕ ♫ ▶ ▤ ○ ✓ ×) is used throughout; icons are hidden from screen readers and ▶ is forced to its plain-text form so phones never show it as a coloured emoji.
 - The homepage displays three direct study-tool links: full-text search, guided reading paths and timed interview practice. Search and Study desk are also linked in the desktop header.
 - The homepage shows a **Continue reading** shortcut after a chapter has been opened in that browser.
 - The homepage's short search filters chapter titles only. The dedicated full-text search page searches the generated index across chapter text and reference resources, requires all query terms to match, and ranks title matches above body/excerpt matches.
