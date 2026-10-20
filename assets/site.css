@@ -1006,8 +1006,9 @@ select { padding: 7px 12px; }
   .nav-actions, .nav-open .nav-actions { position: absolute; top: calc(var(--nav-h) + 8px); right: 12px; width: max-content; max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: flex-end; gap: var(--s2); margin: 0; padding: 10px; overflow: visible;
     background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, .4); transform: translateY(-6px); transition: opacity .2s, transform .28s cubic-bezier(.2, .8, .2, 1), visibility 0s .28s; }
   .nav-open .nav-actions { transform: none; transition: opacity .2s, transform .28s cubic-bezier(.2, .8, .2, 1), visibility 0s; }
-  .header-utility { padding: 11px 12px; }
+    .header-utility { padding: 11px 12px; }
   .nav-links { gap: var(--s1); }
+  .nav-toggle { margin-left: auto; }
 }
 
 /* ---------- 19. Back button (one style, one label, everywhere) ---------- */
