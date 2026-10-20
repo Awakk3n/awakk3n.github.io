@@ -42,7 +42,7 @@
 
   var pageKind = document.body.classList.contains('reader-body') ? 'reader' : 'other';
   var hero = document.querySelector('.hero, .page-hero, .reader-chapter-hero');
-  var BODY = pageKind === 'reader' ? .05 : .08, HERO = .82;      // field strength: the hero (a touch below full) and the body (translucent)                 // strength of the field below the hero (translucent)
+  var BODY = pageKind === 'reader' ? .04 : .06, HERO = .82;      // field strength: the hero (a touch below full) and the body (translucent)                 // strength of the field below the hero (translucent)
   var MAX_BORN = 90, MAX_DEG = 6, HARD_CAP = 560, INTERACTIVE = 'a, button, input, select, textarea, label, summary, kbd, [role="button"]';
   var W = 1, H = 1, dpr = 1, t = 0, dark = true, rgb = ['130,224,202', '136,169,255', '243,189,117'], pts = [];
   var rv = new Float32Array(0), hw = new Float32Array(0), ef = new Float32Array(0), deg = new Uint8Array(0), nxt = new Int32Array(0), head = new Int32Array(0);

@@ -210,7 +210,6 @@ kbd { padding: 2px 6px; border: 1px solid var(--border-strong); border-radius: v
 .button-bright:hover { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 .theme-toggle { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3); min-height: 37px; }
-.toggle-label { font: 500 var(--fs-2xs) var(--font-mono); letter-spacing: .06em; }
 .reader-tool { height: 35px; min-width: 36px; padding: 0 var(--s2); font: 12px var(--font-mono); }
 .reader-action { display: inline-flex; align-items: center; gap: var(--s1); white-space: nowrap; }
 .reader-action span { font-size: var(--fs-2xs); }
@@ -338,7 +337,6 @@ select { padding: 7px 9px; }
 .book-stat { border-left: 1px solid var(--border-strong); padding-left: var(--s3); }
 .book-stat b { display: block; font: 500 20px var(--font-mono); color: var(--a1); }
 .book-stat span { display: block; font: var(--fs-2xs) var(--font-mono); letter-spacing: .06em; color: var(--subtle); margin-top: 5px; }
-.study-hero-links { margin-top: var(--s4); }
 
 /* ---------- 6. Home ---------- */
 .tool-launcher, .library-section { max-width: calc(var(--content) + var(--gutter) * 2); margin: 0 auto; padding-inline: var(--gutter); }
@@ -403,9 +401,6 @@ select { padding: 7px 9px; }
 .peek-audio { margin-left: var(--s2); color: var(--a1); font: 500 var(--fs-2xs) var(--font-mono); letter-spacing: .08em; }
 .book-open { display: inline-flex; align-items: center; gap: var(--s2); text-decoration: none; font: var(--fs-2xs) var(--font-mono); text-transform: uppercase; letter-spacing: .045em; color: var(--a1); margin-top: 20px; transition: gap var(--dur-1); }
 .search-footnote { font: var(--fs-2xs) var(--font-mono); color: var(--subtle); margin: var(--s4) 0 0; }
-.library-search-explainer { margin: var(--s2) 0 0; color: var(--subtle); font-size: 12px; }
-.library-search-explainer a { color: var(--a1); text-decoration: none; border-bottom: 1px solid var(--border-strong); }
-.library-search-explainer a:hover { border-color: var(--a1); }
 
 /* ---------- 7. Volume ---------- */
 .book-page { min-height: 70vh; }
@@ -473,8 +468,6 @@ select { padding: 7px 9px; }
 .reader-outline nav a:hover, .reader-outline nav a.current { color: var(--a1); border-left-color: var(--a1); }
 .reader-outline nav a.current { font-weight: 600; }
 .outline-placeholder { font-size: 12px; color: var(--subtle); }
-.outline-note { display: flex; align-items: flex-start; gap: var(--s2); border-top: 1px solid var(--border); padding-top: var(--s4); margin-top: 28px; color: var(--muted); font: var(--fs-2xs)/1.6 var(--font-mono); }
-.outline-note small { font: var(--fs-xs) var(--font-body); color: var(--subtle); }
 
 .prose { font-size: var(--reader-font); line-height: 1.8; color: var(--text); padding-top: var(--s4); overflow-wrap: anywhere; }
 .prose > * { max-width: 100%; }
@@ -686,7 +679,6 @@ mark.search-hit { box-shadow: 0 0 0 2px rgba(255, 207, 100, .25); }
   .topbar { padding-inline: var(--gutter); }
   .nav-actions { gap: var(--s3); margin-left: auto; }
   .header-utility { font-size: var(--fs-2xs); }
-  .reader-header-utility { display: none; }
   .hero { padding-bottom: 28px; }
   .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; margin: 22px auto 18px; }
   .hero-instrument, .hero-coordinate { display: none !important; }
@@ -751,11 +743,9 @@ mark.search-hit { box-shadow: 0 0 0 2px rgba(255, 207, 100, .25); }
 @media (max-width: 480px) {
   :root { --nav-h: 60px; --gutter: 18px; }
   .topbar { padding-inline: 14px; }
-  .topbar .nav-links .header-utility[href="study.html"] { display: none; }   /* phones keep the short "Search" link; Study desk is in the footer and on the home page */
   .wordmark { font-size: var(--fs-2xs); gap: var(--s2); }
   .mark { width: 20px; height: 20px; }
   .theme-toggle { padding: 7px var(--s2); min-height: 34px; }
-  .toggle-label { font-size: var(--fs-2xs); }
   .hero h1 { font-size: clamp(3.25rem, 13vw, 4.4rem); }
   .hero-rail { gap: var(--s3); letter-spacing: .07em; }
   .rail-index { white-space: nowrap; }
@@ -828,7 +818,6 @@ mark.search-hit { box-shadow: 0 0 0 2px rgba(255, 207, 100, .25); }
   .reader-topbar .nav-actions { gap: var(--s1); }
   .reader-topbar .reader-tool { min-width: 29px; height: 32px; padding-inline: var(--s1); font-size: var(--fs-2xs); }
   .reader-topbar .theme-toggle { min-width: 32px; min-height: 32px; padding: 6px; gap: 0; justify-content: center; }
-  .reader-topbar .toggle-label { display: none; }
 }
 
 /* Text links share one affordance now that decorative arrows are gone: the underline draws in. */
@@ -911,7 +900,6 @@ mark.search-hit { box-shadow: 0 0 0 2px rgba(255, 207, 100, .25); }
 .book-open:hover { gap: var(--s3); }
 .audio-play-icon { font-size: 15px; line-height: 1; }
 .text-link, .book-open, .path-start, .result-open, .back-top, .backlink, .footer-nav a { gap: .45em; }   /* icon + label */
-@media (max-width: 380px) { .theme-toggle .toggle-label { display: none; } }   /* keeps the header on one line at 320 px */
 
 @media (min-width: 1151px) {
   /* The outline never shows a scrollbar, in any state, so its text never shifts when sub-headings open. It still scrolls (wheel, touch,
@@ -965,11 +953,6 @@ mark.search-hit { box-shadow: 0 0 0 2px rgba(255, 207, 100, .25); }
 .seg .reader-tool { border: 0; border-radius: 0; height: 35px; min-width: 38px; }
 .seg .reader-tool + .reader-tool { border-left: 1px solid var(--border-strong); }
 
-/* reader actions: Bookmark, Share and Print are tertiary (text + icon); "Mark as read" is the one outlined action */
-.reader-actions .reader-action { background: none; border-color: transparent; color: var(--muted); padding: 0 var(--s2); }
-.reader-actions .reader-action:hover { background: var(--accent-soft); border-color: transparent; color: var(--a1); }
-.reader-actions .reader-action.is-saved { background: none; border-color: transparent; color: var(--a1); }
-.mark-read.done { background: rgba(var(--a1-rgb), .12); border-color: var(--a1); color: var(--a1); }
 .filter-button.selected { background: rgba(var(--a1-rgb), .12); border-color: var(--a1); color: var(--text); }
 .filter-button.selected span { color: var(--text); }
 
@@ -999,7 +982,80 @@ select { padding: 7px 12px; }
 @media (max-width: 600px) { .resource-toolbar { top: calc(var(--nav-h) + 6px); padding: 6px 10px; margin-top: var(--s3); } }
 
 /* spacing between a label and its icon, wherever the markup is a plain inline link */
-.library-search-explainer a { display: inline-flex; align-items: center; gap: .4em; }
 .reader-tool > span[aria-hidden="true"]:first-child, .import-label > span[aria-hidden="true"]:first-child { margin-right: .45em; }
 .chapter-prev > span > span[aria-hidden="true"] { margin-right: .45em; }
 .chapter-next > span > span[aria-hidden="true"] { margin-left: .45em; }
+
+
+/* ---------- 18. Header ----------
+   The header is the logo and one chevron. Search, Study desk, the theme icon (and the text size on chapters) sit behind the chevron,
+   collapsed by default. Wide screens: they slide out beside it. Phones: they open as a small panel under the header. */
+.topbar { justify-content: flex-start; gap: var(--s3); }
+.nav-toggle { flex: none; width: 38px; height: 38px; margin-left: var(--s2); display: inline-flex; align-items: center; justify-content: center; background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-ctl); color: var(--muted); font: 500 24px/1 var(--font-mono); cursor: pointer; transition: background .18s, border-color .18s, color .18s, transform .18s; }
+.nav-toggle span { display: block; padding-bottom: 3px; transition: transform .34s cubic-bezier(.2, .8, .2, 1); }
+.nav-toggle:hover, .nav-open .nav-toggle { background: var(--accent-soft); border-color: var(--a1); color: var(--a1); }
+.nav-toggle:active { transform: scale(.95); }
+.nav-open .nav-toggle span { transform: rotate(180deg); }
+.nav-actions { display: flex; align-items: center; gap: var(--s2); margin-left: auto; max-width: 0; overflow: hidden; opacity: 0; visibility: hidden; white-space: nowrap; transition: max-width .34s cubic-bezier(.2, .8, .2, 1), opacity .2s, visibility 0s .34s; }
+.nav-open .nav-actions { max-width: 560px; opacity: 1; visibility: visible; transition: max-width .34s cubic-bezier(.2, .8, .2, 1), opacity .26s .06s, visibility 0s; }
+.nav-links { display: flex; gap: var(--s1); }
+.theme-toggle { min-width: 38px; min-height: 38px; padding: 0 10px; justify-content: center; }
+.theme-toggle .toggle-glyph { font-size: 18px; }
+.header-utility[aria-current="page"] { color: var(--a1); }
+@media (max-width: 640px) {
+  .nav-actions, .nav-open .nav-actions { position: absolute; top: calc(var(--nav-h) + 8px); right: 12px; width: max-content; max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: flex-end; gap: var(--s2); margin: 0; padding: 10px; overflow: visible;
+    background: var(--surface); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, .4); transform: translateY(-6px); transition: opacity .2s, transform .28s cubic-bezier(.2, .8, .2, 1), visibility 0s .28s; }
+  .nav-open .nav-actions { transform: none; transition: opacity .2s, transform .28s cubic-bezier(.2, .8, .2, 1), visibility 0s; }
+  .header-utility { padding: 11px 12px; }
+  .nav-links { gap: var(--s1); }
+}
+
+/* ---------- 19. Back button (one style, one label, everywhere) ---------- */
+.backlink { display: inline-flex; align-items: center; gap: .55em; min-height: 36px; padding: 6px 14px 6px 10px; margin: 0 0 var(--s5); background: transparent; border: 1px solid var(--border-strong); border-radius: var(--radius-ctl); color: var(--muted); font: 500 var(--fs-xs) var(--font-mono); letter-spacing: .04em; text-decoration: none; transition: background .18s, border-color .18s, color .18s, transform .18s; }
+.backlink:hover { background: var(--accent-soft); border-color: var(--a1); color: var(--a1); }
+.backlink:active { transform: scale(.97); }
+.reader-rail .backlink { margin-bottom: var(--s4); }
+
+/* ---------- 20. Chapter actions: one equal row (Save · Share · Print · Mark read) ---------- */
+.action-bar { display: inline-grid; grid-auto-flow: column; gap: 0; flex: none; width: max-content; max-width: 100%; border: 1px solid var(--border-strong); border-radius: var(--radius-ctl); overflow: hidden; }
+.action-bar .reader-action { display: inline-flex; align-items: center; justify-content: center; gap: .5em; height: 38px; padding: 0 16px; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--muted); font: 500 var(--fs-xs) var(--font-mono); letter-spacing: .04em; white-space: nowrap; cursor: pointer; transition: background .18s, color .18s; }
+.action-bar .reader-action + .reader-action { border-left: 1px solid var(--border); }
+.action-bar .reader-action span { margin: 0; font-size: inherit; }
+.action-bar .reader-action:hover { background: var(--accent-soft); color: var(--a1); }
+.action-bar .reader-action:active { background: var(--accent-soft); transform: none; }
+.action-bar .reader-action.is-saved, .action-bar .mark-read.done { background: transparent; color: var(--a1); }
+@media (max-width: 640px) {
+  .action-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; max-width: none; }
+  .action-bar .reader-action { padding: 0 4px; gap: .4em; font-size: 11px; }
+}
+@media (max-width: 360px) { .action-bar .reader-action { font-size: 10px; letter-spacing: 0; gap: .3em; } }
+
+/* ---------- 21. Library row, reference-page notes, A–Z ---------- */
+.library-meta { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); flex-wrap: wrap; margin-top: var(--s3); }
+.library-meta .search-footnote { margin: 0; }
+#resource-content:not(.show-notes) .is-note { display: none; }
+.notes-toggle { margin: var(--s4) 0 var(--s2); padding: 6px 0; background: none; border: 0; color: var(--a1); font: 500 var(--fs-xs) var(--font-mono); letter-spacing: .06em; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 5px; transition: text-decoration-color .18s; }
+.notes-toggle:hover { text-decoration-color: currentColor; }
+.notes-toggle::before { content: "+ "; }
+.notes-toggle[aria-expanded="true"]::before { content: "− "; }
+.guide-toc.az a { min-width: 34px; padding: 6px 0; text-align: center; }
+
+/* ---------- 22. Chapter start + vertical rhythm ---------- */
+/* A chapter that opens with a heading (Book 3) now starts exactly where one that opens with an introduction (Books 1 and 2) starts. */
+.prose > :first-child { margin-top: 0; }
+.prose > h2:first-child { padding-top: 0; border-top: 0; }
+/* Inner pages no longer borrow the home hero's full height, and sections stop short of the footer. */
+.page-hero { min-height: 340px; padding-block: 38px; }
+.reader-chapter-hero { min-height: 420px; }
+@media (max-width: 900px) { .page-hero, .reader-chapter-hero { min-height: 0; padding-block: 34px; } }
+.companion-resources { padding-bottom: 48px; }
+.chapter-directory { padding: 56px var(--gutter) 56px; }
+.reader-page { padding-bottom: 56px; }
+.resource-workspace { padding-bottom: 48px; }
+.unified-search { padding-bottom: 48px; }
+.study-section { padding: 44px var(--gutter) 46px; }
+.legal-section { padding-bottom: var(--s7); }
+
+.reader-breadcrumb { margin-left: var(--s5); }
+.backlink { align-self: flex-start; justify-self: start; width: fit-content; }
+@media (max-width: 640px) { .guide-toc.az { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); } .guide-toc.az::-webkit-scrollbar { display: none; } .guide-toc.az a { flex: none; } }

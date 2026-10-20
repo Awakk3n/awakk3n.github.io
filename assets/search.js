@@ -108,7 +108,7 @@
       '<h2><a href="' + href + '">' + F.esc(item.title) + '</a></h2>' +
       '<p>' + highlight(excerpt, words) + (inSnippet ? '' : ' <span class="match-note">(matched in full text)</span>') + '</p>' + alsoHtml +
       '<div class="result-open-row"><span class="search-destination">Search: <b>' + F.esc(query) + '</b></span>' +
-        '<a class="result-open" href="' + href + '">OPEN MATCH <span aria-hidden="true">↗</span></a></div>' +
+        '<a class="result-open" href="' + href + '">OPEN MATCH</a></div>' +
     '</article>';
   }
 

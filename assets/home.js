@@ -64,7 +64,7 @@
         '<div class="book-meta"><span><b>' + pad2(book.chapters.length) + '</b> chapters</span>' +
           '<span><b>' + Math.round(words / 1000) + 'k</b> words (approx.)</span>' +
           (audioCount ? '<span><b>' + audioCount + '</b> audio companions</span>' : '') + '</div>' +
-        '<a class="book-open" href="' + href + '">OPEN VOLUME INDEX <span>↗</span></a>' +
+        '<a class="book-open" href="' + href + '">OPEN VOLUME INDEX</a>' +
       '</div>' +
       '<aside class="book-side"><div class="book-side-label">' + (term ? 'MATCHING CHAPTERS' : 'A FEW ENTRIES') + '</div>' +
         '<div class="chapter-peeks">' + previews.map(chapterPeek).join('') + '</div>' + more + '</aside>' +
@@ -92,8 +92,14 @@
     list.innerHTML = html;
     status.textContent = term
       ? plural(totalMatches, 'chapter') + ' match “' + searchInput.value.trim() + '” across ' + plural(shown, 'volume') + '.'
-      : 'Showing ' + totalMatches + ' chapters across ' + plural(shown, 'volume') + '.';
+      : 'Showing ' + totalMatches + ' chapters across ' + plural(shown, 'volume') + ' · ' + F.allChapters(books).filter(function (c) { return F.isRead(c.id); }).length + ' read';
   }
+
+  var randomButton = F.$('#random-chapter');
+  if (randomButton) randomButton.addEventListener('click', function () {      // a random chapter you have not read yet (any chapter once everything is read)
+    var all = F.allChapters(books), unread = all.filter(function (c) { return !F.isRead(c.id); }), pool = unread.length ? unread : all;
+    if (pool.length) window.location.href = pool[Math.floor(Math.random() * pool.length)].readUrl;
+  });
 
   function setFilter(value) {
     activeFilter = value;

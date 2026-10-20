@@ -14,7 +14,8 @@
   var READING_WPM = 230;               // average adult silent-reading speed for non-fiction
 
   var query = new URLSearchParams(location.search);
-  var id = query.get('chapter');
+  var rawId = query.get('chapter'), id = F.canonicalChapterId(rawId);      // old Book 3 links (book-3-cNN) are accepted and tidied
+  if (rawId && id !== rawId) { query.set('chapter', id); try { history.replaceState(null, '', location.pathname + '?' + query.toString() + location.hash); } catch (error) { /* non-fatal */ } }
   var books = [];
   var chapters = [];
   var chapter;
@@ -52,7 +53,8 @@
     if (done !== shownDone) {
       shownDone = done;
       doneButton.classList.toggle('done', done);
-      doneButton.innerHTML = done ? '<span aria-hidden="true">✓</span> Marked as read' : '<span aria-hidden="true">○</span> Mark as read';
+      doneButton.setAttribute('aria-pressed', done ? 'true' : 'false');
+      doneButton.innerHTML = done ? '<span aria-hidden="true">✓</span><span>Read</span>' : '<span aria-hidden="true">○</span><span>Mark read</span>';
     }
   }
 
@@ -178,12 +180,13 @@
   }
 
   function prepareContentLinks() {
-    F.$$('#chapter-content a').forEach(function (link) {
+    // Every link inside a chapter (glossary terms, other chapters, external sources) opens in a new tab, so reading is never interrupted.
+    // Only same-page anchors (#section) stay in the tab.
+    F.$$('#chapter-content a[href]').forEach(function (link) {
       var href = link.getAttribute('href') || '';
-      if (/^https?:/i.test(href)) {
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-      }
+      if (!href || href.charAt(0) === '#') return;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
     });
   }
 

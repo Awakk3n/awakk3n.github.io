@@ -4,6 +4,24 @@
 (function () {
   'use strict';
 
+  /* ---- Chapter ids ----
+     Book 3 used book-3-cNN; it now follows the same pattern as the other books (book-N-ch-NN). Old links still work (canonicalChapterId),
+     and anything already saved in a reader's browser (progress, bookmarks, notes, audio positions, last read) is renamed once, before any
+     module reads it. */
+  var OLD_BOOK3_ID = /book-3-c(\d+)/g;
+  function canonicalChapterId(id) { return typeof id === 'string' ? id.replace(/^book-3-c(\d+)$/, 'book-3-ch-$1') : id; }
+  (function migrateStoredIds() {
+    try {
+      if (localStorage.getItem('field-ids-v2')) return;
+      Object.keys(localStorage).forEach(function (key) {
+        if (key.indexOf('field-') !== 0 || key === 'field-theme') return;
+        var raw = localStorage.getItem(key); OLD_BOOK3_ID.lastIndex = 0;
+        if (raw && OLD_BOOK3_ID.test(raw)) { OLD_BOOK3_ID.lastIndex = 0; localStorage.setItem(key, raw.replace(OLD_BOOK3_ID, 'book-3-ch-$1')); }
+      });
+      localStorage.setItem('field-ids-v2', '1');
+    } catch (error) { /* storage unavailable: nothing to migrate */ }
+  })();
+
   var root = document.documentElement;
   root.classList.add('js');
 
@@ -85,9 +103,7 @@
     $$('.theme-toggle').forEach(function (button) {
       button.setAttribute('aria-label', toDark ? 'Switch to dark mode' : 'Switch to light mode');
       var glyph = $('.toggle-glyph', button);
-      var label = $('.toggle-label', button);
       if (glyph) glyph.textContent = toDark ? '◐' : '☼';
-      if (label) label.textContent = toDark ? 'DARK' : 'LIGHT';
     });
   }
 
@@ -122,6 +138,30 @@
     if (systemQuery.addEventListener) systemQuery.addEventListener('change', followSystem);
     else if (systemQuery.addListener) systemQuery.addListener(followSystem);
   }
+
+  /* ---- The header's tools (Search, Study desk, theme, text size) sit behind one chevron, collapsed by default ---- */
+  $$('.topbar').forEach(function (bar) {
+    var toggle = $('.nav-toggle', bar), tools = $('.nav-actions', bar);
+    if (!toggle || !tools) return;
+    function setOpen(open, returnFocus) {
+      bar.classList.toggle('nav-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Hide Search, Study desk and display options' : 'Show Search, Study desk and display options');
+      if (!open && returnFocus) toggle.focus();
+    }
+    toggle.addEventListener('click', function () { setOpen(!bar.classList.contains('nav-open')); });
+    document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && bar.classList.contains('nav-open')) setOpen(false, true); });
+    document.addEventListener('pointerdown', function (event) { if (bar.classList.contains('nav-open') && !bar.contains(event.target)) setOpen(false); });
+  });
+
+  /* ---- "← Back": history back when the reader came from this site, otherwise the link's own destination ---- */
+  document.addEventListener('click', function (event) {
+    var link = event.target.closest ? event.target.closest('a[data-back]') : null;
+    if (!link || event.defaultPrevented || event.button || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    var sameSite = false;
+    try { sameSite = document.referrer && new URL(document.referrer).origin === location.origin; } catch (error) { sameSite = false; }
+    if (sameSite && window.history.length > 1) { event.preventDefault(); window.history.back(); }
+  });
 
   /* ---- "/" focuses whichever search field the page has ---- */
   document.addEventListener('keydown', function (event) {
@@ -224,6 +264,7 @@
     writeJSON: writeJSON,
     rememberProgress: rememberProgress,
     isRead: isRead,
+    canonicalChapterId: canonicalChapterId,
     READ_THRESHOLD: READ_THRESHOLD,
     applySearchContext: applySearchContext,
 

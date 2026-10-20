@@ -53,13 +53,55 @@
     });
   }
 
-  function openExternalLinks() {
+  function openExternalLinks() {      // every link (chapters, glossary terms, sources) opens in a new tab; only same-page anchors (#x) stay
     article.querySelectorAll('a[href]').forEach(function (link) {
-      if (/^https?:\/\//i.test(link.href)) {
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-      }
+      var href = link.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#') return;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
     });
+  }
+
+  /* The generated pages begin with maintainers' notes (where the file came from, schema, protocol, merge log). Readers get the entries first;
+     the notes are one click away under "About this index". */
+  function markNotes() {
+    var nodes = children(), notes = [];
+    if (nodes[0] && /^generated from/i.test(nodes[0].textContent.trim())) notes.push(nodes[0]);
+    function section(title) {
+      var i = nodes.findIndex(function (n) { return n.tagName === 'H2' && n.textContent.trim().toLowerCase() === title; });
+      if (i < 0) return;
+      notes.push(nodes[i]);
+      for (var j = i + 1; j < nodes.length && nodes[j].tagName !== 'H2'; j++) notes.push(nodes[j]);
+    }
+    if (resource.id === 'glossary') {
+      var e = nodes.findIndex(function (n) { return n.tagName === 'H2' && /^entries/i.test(n.textContent.trim()); });
+      nodes.slice(0, e < 0 ? 0 : e).forEach(function (n) { notes.push(n); });
+    } else if (resource.id === 'interview-bank') { section('schema'); }
+    else if (resource.id === 'frameworks') { section('protocol'); section('merge and retire log'); }
+    notes.forEach(function (n) { n.classList.add('is-note'); });
+    if (!notes.length) return;
+    var toggle = document.createElement('button');
+    toggle.type = 'button'; toggle.className = 'notes-toggle'; toggle.setAttribute('aria-expanded', 'false'); toggle.textContent = 'About this index';
+    toggle.addEventListener('click', function () {
+      var open = article.classList.toggle('show-notes');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false'); toggle.textContent = open ? 'Hide notes' : 'About this index';
+    });
+    article.parentNode.insertBefore(toggle, article);
+  }
+
+  /* Glossary: an A–Z strip to jump to a letter. */
+  function prepareAZ() {
+    if (resource.id !== 'glossary' || !guideToc) return;
+    var seen = Object.create(null);
+    guideToc.replaceChildren();
+    Array.prototype.forEach.call(article.querySelectorAll('h3'), function (heading, i) {
+      var letter = (heading.textContent.trim().charAt(0) || '#').toUpperCase(); if (!/[A-Z]/.test(letter)) letter = '#';
+      if (seen[letter]) return; seen[letter] = true;
+      if (!heading.id) heading.id = 'glossary-letter-' + (letter === '#' ? 'other' : letter.toLowerCase());
+      var link = document.createElement('a'); link.href = '#' + heading.id; link.textContent = letter; link.setAttribute('aria-label', 'Jump to terms starting with ' + letter);
+      link.removeAttribute('target'); guideToc.appendChild(link);
+    });
+    guideToc.classList.add('az'); guideToc.setAttribute('aria-label', 'Jump to a letter'); guideToc.hidden = !guideToc.children.length;
   }
 
   function children() {
@@ -298,6 +340,8 @@
     assignFrameworkRowAnchors();
     openExternalLinks();
     prepareGuide();
+    markNotes();
+    prepareAZ();
 
     if (resource.kind === 'interview-bank') {
       interviewFilters.hidden = false;

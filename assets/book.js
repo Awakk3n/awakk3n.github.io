@@ -34,7 +34,7 @@
 
   function chapterRow(chapter, audio) {
     var read = F.isRead(chapter.id);
-    var status = audio[chapter.id] ? '♫ AUDIO' : (read ? '✓' : '↗');
+    var status = audio[chapter.id] ? '♫ AUDIO' : (read ? '✓' : '');
     return '<a class="chapter-row" href="' + F.esc(chapter.readUrl) + '">' +
       '<span class="chapter-row-number">' + F.esc(chapter.label) + '</span>' +
       '<span class="chapter-row-title">' + F.esc(chapter.title) + '</span>' +

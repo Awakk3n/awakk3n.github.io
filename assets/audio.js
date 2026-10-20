@@ -136,7 +136,7 @@
     var heading = element('h2', 'audio-title', 'Listen to this chapter');
     heading.id = titleId;
     copy.appendChild(heading);
-    copy.appendChild(element('p', 'audio-note', 'Streams from YouTube. Keep this tab open and the player on screen — your browser pauses it when the screen locks or you switch apps.'));
+    copy.appendChild(element('p', 'audio-note', 'Keep this tab open and the player on screen — your browser pauses it when the screen locks or you switch apps.'));
 
     var actions = element('div', 'audio-actions');
     var playButton = element('button', 'button button-bright audio-play');

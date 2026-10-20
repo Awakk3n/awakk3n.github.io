@@ -12,9 +12,9 @@
   var SCORE_RANGE = { min: 1, max: 5 };
   var PATHS = [
     { id: 'foundations', number: '01', title: 'PM foundations', description: 'Build a durable base in product thinking, discovery, strategy and metrics.', chapters: ['book-1-ch-01','book-1-ch-02','book-1-ch-03','book-1-ch-04','book-1-ch-05','book-1-ch-07'] },
-    { id: 'metrics', number: '02', title: 'Metrics and experiments', description: 'Go from defining a metric to diagnosing movement and making causal decisions.', chapters: ['book-3-c05','book-3-c12','book-3-c13','book-3-c14','book-3-c17'] },
-    { id: 'ai-product', number: '03', title: 'AI product management', description: 'Understand ranking, LLM products, evaluation and system-level trade-offs.', chapters: ['book-1-ch-11','book-3-c22','book-3-c23','book-3-c24','book-3-c25'] },
-    { id: 'apm-interviews', number: '04', title: 'APM interview sprint', description: 'Prepare structured answers across design, estimation, behavioral and interview calibration.', chapters: ['book-3-c01','book-3-c03','book-3-c04','book-3-c07','book-3-c13','book-3-c31','book-3-c32','book-3-c33','book-3-c34','book-3-c37'] }
+    { id: 'metrics', number: '02', title: 'Metrics and experiments', description: 'Go from defining a metric to diagnosing movement and making causal decisions.', chapters: ['book-3-ch-05','book-3-ch-12','book-3-ch-13','book-3-ch-14','book-3-ch-17'] },
+    { id: 'ai-product', number: '03', title: 'AI product management', description: 'Understand ranking, LLM products, evaluation and system-level trade-offs.', chapters: ['book-1-ch-11','book-3-ch-22','book-3-ch-23','book-3-ch-24','book-3-ch-25'] },
+    { id: 'apm-interviews', number: '04', title: 'APM interview sprint', description: 'Prepare structured answers across design, estimation, behavioral and interview calibration.', chapters: ['book-3-ch-01','book-3-ch-03','book-3-ch-04','book-3-ch-07','book-3-ch-13','book-3-ch-31','book-3-ch-32','book-3-ch-33','book-3-ch-34','book-3-ch-37'] }
   ];
   var books = window.FIELD_BOOKS || [];
   var chapters = F.allChapters(books);
@@ -37,7 +37,7 @@
       '<div class="path-progress-label"><span>' + done + ' / ' + items.length + ' chapters read</span><span>' + percent + '%</span></div>' +
       '<div class="path-progress"><span style="transform:scaleX(' + percent / 100 + ')"></span></div>' +
       '<details class="path-steps"><summary>View the chapter sequence</summary><ol>' + steps + '</ol></details>' +
-      '<a class="path-start" href="' + esc(next ? next.readUrl : 'index.html') + '">' + action + ' <span aria-hidden="true">↗</span></a>' +
+      '<a class="path-start" href="' + esc(next ? next.readUrl : 'index.html') + '">' + action + '</a>' +
       '</div></article>';
   }
 
