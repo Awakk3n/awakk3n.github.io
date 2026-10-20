@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-21 — Collapsible header, Back button, consistent chapter ids, calmer pages
+- **Header:** the header is the logo and one chevron `‹`, collapsed by default. It opens to Search, Study desk, the theme icon (and the text-size control on chapters): sliding out beside the chevron on wide screens, as a small panel on phones. Escape or a click elsewhere closes it. Search and Study desk are on every page at every width (they were missing on phones); the theme button is icon-only (no "Light/Dark" word).
+- **Back button:** one style and one label, "← Back", on every page that had a back link (library, book index, reference pages, chapter sidebar, privacy). It goes back in history when you came from this site, and to the sensible destination otherwise; its accessible name says where it goes.
+- **Landing page:** the hero no longer has "Explore the collection" / "Search all content". The library note ("Showing 85 chapters… This quick filter searches chapter titles… Search the full text") is replaced by a status line with your reading progress and a **Random unread chapter** button, placed next to the filters.
+- **Repetition removed:** footers no longer repeat Search / Study desk; the reader's sidebar "Saved on this device" note (repeated by the notes box); the study page's duplicate search link and privacy sentence; the home page's tool and library intro sentences; "Streams from YouTube" in the audio card. Arrows removed from text links, nav and buttons (kept on whole-row cards, direction arrows and state icons).
+- **Chapter actions:** Save · Share · Print · Mark read are one bar of four equal buttons (desktop: joined bar; phone: four equal columns). "Mark read" no longer stands out.
+- **Chapter ids:** Book 3 now uses `book-3-ch-NN` like Books 1 and 2 (`b3-NN-…` source files). Old links (`book-3-cNN`) still open, the address is tidied, and anything saved in a reader's browser (progress, bookmarks, notes, audio positions) is renamed automatically, once. On-page labels (C03…) are unchanged because the glossary and frameworks cite chapters by them.
+- **Chapter start:** a chapter that opens with a heading (Book 3) now starts exactly where one that opens with an introduction (Books 1, 2) does.
+- **Links in the book** (glossary terms, other chapters, external sources) open in a new tab; same-page anchors stay.
+- **Reference pages:** the glossary, interview bank and frameworks open on the entries; maintainers' notes ("Generated from tools/state.json", rules, schema, protocol, merge log) are behind "+ About this index". The glossary has an A–Z strip.
+- **Spacing:** inner-page heroes no longer take the home hero's full height, and sections stop 48–56 px above the footer (they left 100–190 px).
+- **Particles:** body a touch more translucent (6%; chapter pages 4%).
+- **Share preview:** new `assets/og-image.png` from the live hero; complete share tags on every page (they existed only on the home page).
+- Tests: `behaviour.js`, `narrow.js`, `check-links.js` added; functional updated.
+
 ## 2026-10-20 — Flat controls, no glass, stretched bonds fixed
 - **Glass look removed.** Controls are now a three-level system: one solid PRIMARY button per view, quiet outlined SECONDARY buttons, and TERTIARY text-with-icon for navigation and light actions. Far fewer boxes: the reader header went from five boxed buttons to two controls (one joined text-size control and the theme button); header navigation is plain text with an icon; Bookmark / Share / Print are text actions and "Mark as read" is the one outlined action; "Clear" is a text link.
 - **Text size:** A− and A+ are one joined control and switch off at the smallest and largest size.
