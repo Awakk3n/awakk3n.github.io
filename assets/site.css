@@ -679,7 +679,7 @@ mark.search-hit { box-shadow: 0 0 0 2px rgba(255, 207, 100, .25); }
   .topbar { padding-inline: var(--gutter); }
   .nav-actions { gap: var(--s3); margin-left: auto; }
   .header-utility { font-size: var(--fs-2xs); }
-  .hero { padding-bottom: 28px; }
+  .hero { padding-bottom: 28px; min-height: 0; }
   .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; margin: 22px auto 18px; }
   .hero-instrument, .hero-coordinate { display: none !important; }
   .hero h1 { font-size: clamp(3.5rem, 10vw, 5.5rem); }
