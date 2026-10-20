@@ -25,6 +25,10 @@ RESOURCES_DIR = ROOT / "resources"
 MARKDOWN = MarkdownIt("default", {"html": False, "typographer": False})
 FRONT_MATTER = re.compile(r"^\ufeff?---\s*\r?\n[\s\S]*?\r?\n---\s*\r?\n")
 WIKILINK = re.compile(r"\[\[([a-z0-9][a-z0-9-]*)\]\]", re.I)
+BOOK_ANCHOR_LINE = re.compile(r"^\s*<a\s+id=(?:\"([^\"]+)\"|'([^']+)')\s*>\s*</a>\s*$", re.I)
+BOOK_ANCHOR_TOKEN = re.compile(r"(?:<p>\s*FIELD_BOOK_ANCHOR_(\d+)__\s*</p>|FIELD_BOOK_ANCHOR_(\d+)__)")
+MAX_BOOK_CHUNK_CHARS = 80_000
+MAX_BOOK_TABLE_CHUNK_CHARS = 40_000
 INTERVIEW_HEADING = re.compile(r"^###\s+(IQ-C\d{2}-\d{2})\s*$")
 INTERVIEW_META = re.compile(
     r"\*\*Type:\*\*\s*(.*?)\s*·\s*\*\*Difficulty:\*\*\s*(.*?)\s*·\s*\*\*Source chapter:\*\*\s*(.*?)\s*·\s*\*\*Competency:\*\*\s*(.*?)\s*·\s*\*\*Company tag:\*\*\s*(.*?)\s*$"
@@ -150,11 +154,164 @@ def parse_interview_meta(markdown: str) -> dict[str, dict[str, str]]:
     return meta
 
 
+def replace_book_anchor_lines(markdown: str) -> tuple[str, dict[int, str]]:
+    """Replace standalone HTML anchor declarations with safe placeholders outside code fences."""
+    output: list[str] = []
+    anchor_ids: dict[int, str] = {}
+    seen: set[str] = set()
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+    for line in markdown.splitlines():
+        fence = re.match(r"^\s*(`{3,}|~{3,})", line)
+        if fence:
+            token = fence.group(1)
+            if not in_fence:
+                in_fence, fence_char, fence_len = True, token[0], len(token)
+            elif token[0] == fence_char and len(token) >= fence_len:
+                in_fence, fence_char, fence_len = False, "", 0
+            output.append(line)
+            continue
+        if not in_fence:
+            match = BOOK_ANCHOR_LINE.match(line)
+            if match:
+                anchor_id = match.group(1) or match.group(2)
+                # Duplicate HTML IDs are invalid. Keep the first occurrence only.
+                if anchor_id in seen:
+                    output.append("")
+                    continue
+                seen.add(anchor_id)
+                token_id = len(anchor_ids)
+                anchor_ids[token_id] = anchor_id
+                output.append(f"FIELD_BOOK_ANCHOR_{token_id}__")
+                continue
+        output.append(line)
+    return "\n".join(output) + ("\n" if markdown.endswith("\n") else ""), anchor_ids
+
+
+def _top_level_html_blocks(markdown_html: str) -> list[str]:
+    """Return complete top-level HTML blocks without cutting lists, tables or code blocks."""
+    tag_pattern = re.compile(r"<!--.*?-->|<![^>]*>|</?([A-Za-z][A-Za-z0-9:-]*)\b[^>]*>", re.S)
+    void_tags = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+    blocks: list[str] = []
+    depth = 0
+    block_start: int | None = None
+
+    for match in tag_pattern.finditer(markdown_html):
+        token = match.group(0)
+        if token.startswith("<!--") or token.startswith("<!"):
+            if depth == 0:
+                if block_start is not None:
+                    blocks.append(markdown_html[block_start:match.start()].strip())
+                    block_start = None
+                blocks.append(token)
+            continue
+
+        tag_match = match.group(1)
+        if not tag_match:
+            continue
+        tag = tag_match.lower()
+        is_closing = token.startswith("</")
+        is_void = tag in void_tags or token.rstrip().endswith("/>")
+
+        if not is_closing:
+            if depth == 0:
+                block_start = match.start()
+            if not is_void:
+                depth += 1
+            elif depth == 0 and block_start is not None:
+                blocks.append(markdown_html[block_start:match.end()].strip())
+                block_start = None
+        else:
+            if depth > 0:
+                depth -= 1
+            if depth == 0 and block_start is not None:
+                blocks.append(markdown_html[block_start:match.end()].strip())
+                block_start = None
+
+    if block_start is not None:
+        blocks.append(markdown_html[block_start:].strip())
+    return [block for block in blocks if block]
+
+
+def _split_large_table(block: str) -> list[str]:
+    """Split unusually large Markdown tables between complete rows, repeating their header."""
+    opening = re.match(r"<table(?:\s[^>]*)?>", block, re.I)
+    thead = re.search(r"<thead(?:\s[^>]*)?>[\s\S]*?</thead>", block, re.I)
+    tbody = re.search(r"(<tbody(?:\s[^>]*)?>)([\s\S]*?)(</tbody>)", block, re.I)
+    if not opening or not tbody:
+        return [block]
+    rows = re.findall(r"<tr(?:\s[^>]*)?>[\s\S]*?</tr>", tbody.group(2), re.I)
+    if len(rows) < 2:
+        return [block]
+
+    table_open = opening.group(0)
+    header = thead.group(0) if thead else ""
+    wrapper_start = table_open + ("\n" + header if header else "") + "\n" + tbody.group(1) + "\n"
+    wrapper_end = "\n" + tbody.group(3) + "\n</table>"
+    pieces: list[str] = []
+    current_rows: list[str] = []
+    current_size = len(wrapper_start) + len(wrapper_end)
+    for row in rows:
+        row_size = len(row) + 1
+        if current_rows and current_size + row_size > MAX_BOOK_TABLE_CHUNK_CHARS:
+            pieces.append(wrapper_start + "\n".join(current_rows) + wrapper_end)
+            current_rows = []
+            current_size = len(wrapper_start) + len(wrapper_end)
+        current_rows.append(row)
+        current_size += row_size
+    if current_rows:
+        pieces.append(wrapper_start + "\n".join(current_rows) + wrapper_end)
+    return pieces
+
+
+def split_rendered_book(markdown_html: str) -> list[str]:
+    """Split rendered books into bounded chunks only between complete HTML blocks or table rows."""
+    raw_blocks = _top_level_html_blocks(markdown_html)
+    blocks: list[str] = []
+    for block in raw_blocks:
+        if len(block) > MAX_BOOK_TABLE_CHUNK_CHARS and block.lstrip().lower().startswith("<table"):
+            blocks.extend(_split_large_table(block))
+        else:
+            blocks.append(block)
+
+    chunks: list[str] = []
+    current: list[str] = []
+    current_size = 0
+
+    def flush() -> None:
+        nonlocal current, current_size
+        if current:
+            chunks.append("\n".join(current) + "\n")
+            current = []
+            current_size = 0
+
+    for block in blocks:
+        is_top_level_heading = bool(re.match(r"<h1(?:\s|>)", block))
+        if current and (is_top_level_heading or current_size >= MAX_BOOK_CHUNK_CHARS or current_size + len(block) + 1 > MAX_BOOK_CHUNK_CHARS):
+            flush()
+        current.append(block)
+        current_size += len(block) + 1
+    flush()
+    return [chunk for chunk in chunks if chunk.strip()]
+
+
 def render_markdown(markdown: str, labels: dict[str, str], kind: str | None = None) -> str:
     source = convert_wikilinks(markdown, labels)
+    book_anchors: dict[int, str] = {}
+    if kind == "full-book":
+        source, book_anchors = replace_book_anchor_lines(source)
     rendered = MARKDOWN.render(source)
     # The hero already provides the resource title, so remove the repeated source-file H1.
-    rendered = re.sub(r"^<h1>.*?</h1>\s*", "", rendered, count=1)
+    rendered = re.sub(r"<h1>.*?</h1>\s*", "", rendered, count=1)
+    if book_anchors:
+        def restore_book_anchor(match: re.Match[str]) -> str:
+            token_id = int(match.group(1) or match.group(2))
+            anchor_id = book_anchors.get(token_id)
+            if anchor_id is None:
+                return ""
+            return f'<span id="{html.escape(anchor_id, quote=True)}"></span>'
+        rendered = BOOK_ANCHOR_TOKEN.sub(restore_book_anchor, rendered)
 
     if kind == "glossary":
         rendered = re.sub(
@@ -212,12 +369,18 @@ def build_search_and_practice_data(books: list[dict], labels: dict[str, str]) ->
     search_items: list[dict[str, str]] = []
     for book in books:
         for chapter in book.get("chapters", []):
-            path = ROOT / chapter["file"]
-            raw = FRONT_MATTER.sub("", path.read_text(encoding="utf-8-sig"), count=1)
-            text = plain_markdown(raw, labels)
+            is_full_book = chapter.get("kind") == "full-book"
+            if is_full_book:
+                # Individual chapter entries already index the complete body. Index the book title
+                # once rather than duplicating millions of tokens in the global search bundle.
+                text = "Complete book full text; Product Management; APM interview preparation."
+            else:
+                path = ROOT / chapter["file"]
+                raw = FRONT_MATTER.sub("", path.read_text(encoding="utf-8-sig"), count=1)
+                text = plain_markdown(raw, labels)
             search_items.append({
                 "kind": "chapter", "title": chapter["title"],
-                "subtitle": book["title"] + " · Chapter " + str(chapter.get("label", "")),
+                "subtitle": book["title"] + (" · Complete book" if is_full_book else " · Chapter " + str(chapter.get("label", ""))),
                 "url": chapter["readUrl"], "text": text, "book": book["title"]
             })
 
@@ -335,17 +498,52 @@ def main() -> None:
             if ROOT not in source_path.parents or not source_path.is_file():
                 missing.append(f"{chapter.get('id', '(missing id)')}: {source_rel}")
                 continue
-            chapter["contentFile"] = source_path.relative_to(ROOT).with_suffix(".content.js").as_posix()
+            content_path = source_path.with_suffix(".content.js")
+            chapter["contentFile"] = content_path.relative_to(ROOT).as_posix()
             raw = source_path.read_text(encoding="utf-8-sig")
             normalized = FRONT_MATTER.sub("", raw, count=1)
-            rendered = render_markdown(normalized, labels)
-            payload = (
-                "/* Generated by build_site_data.py; edit the Markdown source instead. */\n"
-                "window.FIELD_CHAPTER_HTML = window.FIELD_CHAPTER_HTML || {};\n"
-                f"window.FIELD_CHAPTER_HTML[{js_json(chapter['id'])}] = {js_json(rendered)};\n"
-            )
-            (ROOT / chapter["contentFile"]).write_text(payload, encoding="utf-8", newline="\n")
-            chapter_count += 1
+
+            if chapter.get("kind") == "full-book":
+                # Pre-render at build time, but ship it as small JS chunks instead of one multi-MB
+                # JavaScript string. This keeps the site's existing chapter-file architecture while
+                # allowing the reader to show the opening section before the rest arrives.
+                rendered = render_markdown(normalized, labels, kind="full-book")
+                chunks = split_rendered_book(rendered)
+                if not chunks:
+                    raise SystemExit(f"No rendered content for {chapter['id']}: {source_rel}")
+                old_parts = set(CHAPTERS.glob(source_path.stem + ".part-*.content.js"))
+                part_paths = [content_path]
+                for part_index, part_html in enumerate(chunks[1:], start=2):
+                    part_path = source_path.with_name(f"{source_path.stem}.part-{part_index:03d}.content.js")
+                    part_paths.append(part_path)
+                keep = set(part_paths[1:])
+                for stale in old_parts - keep:
+                    stale.unlink(missing_ok=True)
+                first_payload = (
+                    "/* Generated by build_site_data.py; edit the Markdown source instead. */\n"
+                    "window.FIELD_CHAPTER_HTML = window.FIELD_CHAPTER_HTML || {};\n"
+                    f"window.FIELD_CHAPTER_HTML[{js_json(chapter['id'])}] = {js_json(chunks[0])};\n"
+                )
+                content_path.write_text(first_payload, encoding="utf-8", newline="\n")
+                for part_index, (part_path, part_html) in enumerate(zip(part_paths[1:], chunks[1:]), start=1):
+                    payload = (
+                        "/* Generated by build_site_data.py; edit the Markdown source instead. */\n"
+                        "window.FIELD_CHAPTER_PARTS = window.FIELD_CHAPTER_PARTS || {};\n"
+                        f"window.FIELD_CHAPTER_PARTS[{js_json(chapter['id'])}] = window.FIELD_CHAPTER_PARTS[{js_json(chapter['id'])}] || {{}};\n"
+                        f"window.FIELD_CHAPTER_PARTS[{js_json(chapter['id'])}][{part_index}] = {js_json(part_html)};\n"
+                    )
+                    part_path.write_text(payload, encoding="utf-8", newline="\n")
+                chapter["contentParts"] = [path.relative_to(ROOT).as_posix() for path in part_paths]
+            else:
+                chapter.pop("contentParts", None)
+                rendered = render_markdown(normalized, labels)
+                payload = (
+                    "/* Generated by build_site_data.py; edit the Markdown source instead. */\n"
+                    "window.FIELD_CHAPTER_HTML = window.FIELD_CHAPTER_HTML || {};\n"
+                    f"window.FIELD_CHAPTER_HTML[{js_json(chapter['id'])}] = {js_json(rendered)};\n"
+                )
+                content_path.write_text(payload, encoding="utf-8", newline="\n")
+                chapter_count += 1
 
     if missing:
         raise SystemExit("Missing or invalid chapter sources:\n" + "\n".join(missing))
