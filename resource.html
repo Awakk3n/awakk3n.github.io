@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#080d14"><meta name="color-scheme" content="dark light">
+  <meta name="description" content="Book 3 companion resource in The Product Field learning library.">
+  <title>Companion resource — The Product Field</title>
+  <link rel="icon" href="assets/favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/theme-init.js"></script>
+</head>
+<body class="resource-body"><a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar" id="top">
+    <a class="wordmark" href="index.html" aria-label="The Product Field homepage"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>THE PRODUCT FIELD</span></a>
+    
+    <div class="nav-actions"><a class="header-utility" href="search.html">Search</a><a class="header-utility" href="study.html">Study desk</a><button class="theme-toggle" type="button" aria-label="Switch to light mode" title="Switch theme"><span class="toggle-glyph" aria-hidden="true">☼</span><span class="toggle-label">LIGHT</span></button></div>
+  </header>
+  <main id="main" class="resource-page">
+    <section class="page-hero resource-hero" aria-labelledby="resource-title">
+      <canvas class="particle-layer" aria-hidden="true"></canvas>
+      <div class="page-hero-inner">
+        <a class="backlink" href="book.html?b=3">← BOOK 3 / CHAPTER INDEX</a>
+        <p id="resource-eyebrow" class="section-kicker">BOOK 3 / COMPANION RESOURCE</p>
+        <h1 id="resource-title">Opening the resource…</h1>
+        <p id="resource-description" class="book-subtitle"></p>
+        <div class="book-stats"><div class="book-stat"><b id="resource-count">—</b><span>REFERENCE INDEX</span></div><div class="book-stat"><b>BOOK 03</b><span>COMPANION FILE</span></div></div>
+      </div>
+    </section>
+    <section class="resource-workspace" aria-label="Resource content">
+      <div class="resource-toolbar">
+        <label class="search-box resource-search-box">
+          <span aria-hidden="true">⌕</span>
+          <input id="resource-search" type="search" placeholder="Search within this resource…" autocomplete="off" aria-label="Search within this resource">
+          <kbd>/</kbd>
+        </label>
+        <div class="resource-filters" id="interview-filters" hidden>
+          <label><span>TYPE</span><select id="filter-type" aria-label="Filter by question type"><option value="">All types</option></select></label>
+          <label><span>DIFFICULTY</span><select id="filter-difficulty" aria-label="Filter by difficulty"><option value="">All levels</option></select></label>
+          <label><span>COMPANY</span><select id="filter-company" aria-label="Filter by company"><option value="">All companies</option></select></label>
+        </div>
+        <label class="resource-core-filter" id="framework-core-filter" hidden><input id="filter-core" type="checkbox"><span>Core frameworks only</span></label>
+        <div class="resource-results"><span id="resource-result-count" aria-live="polite">Preparing resource…</span><button id="clear-resource-search" type="button" disabled>Clear</button></div>
+      </div>
+      <nav id="guide-toc" class="guide-toc" aria-label="Guide sections" hidden></nav>
+      <div class="resource-reading">
+        <div id="resource-load-error" class="content-error" hidden></div>
+        <p id="resource-empty" class="resource-empty" hidden>No matches. Try another search or clear the filters.</p>
+        <article id="resource-content" class="prose resource-prose"><div class="loading-line">Preparing the reference file…</div></article>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer reader-footer">
+    <a class="wordmark" href="index.html"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>THE PRODUCT FIELD</span></a>
+    <a href="book.html?b=3" class="back-top">BACK TO BOOK 3 ↑</a>
+    <a href="#top" class="back-top">BACK TO TOP ↑</a>
+  </footer>
+  <script src="assets/particles.js"></script>
+  <script src="assets/app.js"></script>
+  <script src="assets/resource-data.js"></script>
+  <script src="assets/resource.js"></script>
+</body>
+</html>
