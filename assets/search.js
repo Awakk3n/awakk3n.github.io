@@ -75,18 +75,38 @@
     return total;
   }
 
-  function resultHtml(item, words, query) {
-    var excerpt = item.excerpt || item.subtitle || '';
-    var inSnippet = words.some(function (word) { return excerpt.toLowerCase().indexOf(word) >= 0; });
+  function hrefFor(item, query) {
     var destination = new URL(item.url, location.href);
     destination.searchParams.set('find', query);
     destination.searchParams.set('fromSearch', '1');
-    var href = F.esc(destination.pathname.split('/').pop() + destination.search + destination.hash);
+    return F.esc(destination.pathname.split('/').pop() + destination.search + destination.hash);
+  }
+
+  /* Volume 2 repeats most of Volume 1 almost word for word. Identical chapter hits collapse into one
+     result that links to the other volume(s), instead of listing the same text twice. */
+  function collapseCopies(matches) {
+    var seen = Object.create(null), out = [];
+    matches.forEach(function (m) {
+      var key = m.item.kind === 'chapter' ? m.item.title + '|' + m.item.excerpt : '';
+      if (key && seen[key]) { seen[key].also.push(m.item); return; }
+      m.also = [];
+      if (key) seen[key] = m;
+      out.push(m);
+    });
+    return out;
+  }
+
+  function resultHtml(item, words, query, also) {
+    var excerpt = item.excerpt || item.subtitle || '';
+    var inSnippet = words.some(function (word) { return excerpt.toLowerCase().indexOf(word) >= 0; });
+    var href = hrefFor(item, query);
+    var alsoHtml = also && also.length
+      ? '<p class="result-also">Also in: ' + also.map(function (other) { return '<a href="' + hrefFor(other, query) + '">' + F.esc(other.book) + '</a>'; }).join(' · ') + '</p>' : '';
     return '<article class="unified-result">' +
       '<div class="result-label">' + F.esc(KIND_LABELS[item.kind] || item.kind.toUpperCase()) +
         '<span>' + F.esc(item.book || item.subtitle || '') + '</span></div>' +
       '<h2><a href="' + href + '">' + F.esc(item.title) + '</a></h2>' +
-      '<p>' + highlight(excerpt, words) + (inSnippet ? '' : ' <span class="match-note">(matched in full text)</span>') + '</p>' +
+      '<p>' + highlight(excerpt, words) + (inSnippet ? '' : ' <span class="match-note">(matched in full text)</span>') + '</p>' + alsoHtml +
       '<div class="result-open-row"><span class="search-destination">Search: <b>' + F.esc(query) + '</b></span>' +
         '<a class="result-open" href="' + href + '">OPEN MATCH <span aria-hidden="true">↗</span></a></div>' +
     '</article>';
@@ -118,11 +138,12 @@
       if (item && (wanted === 'all' || item.kind === wanted)) matches.push({ item: item, score: score(item, words, phrase) });
     });
     matches.sort(function (a, b) { return b.score - a.score || a.item.title.localeCompare(b.item.title); });
+    matches = collapseCopies(matches);
 
     status.textContent = matches.length.toLocaleString() + ' result' + (matches.length === 1 ? '' : 's') +
       (matches.length > MAX_RESULTS ? ' · showing the first ' + MAX_RESULTS : '');
     results.innerHTML = matches.length
-      ? matches.slice(0, MAX_RESULTS).map(function (m) { return resultHtml(m.item, words, query); }).join('')
+      ? matches.slice(0, MAX_RESULTS).map(function (m) { return resultHtml(m.item, words, query, m.also); }).join('')
       : '<p class="search-hint">No matches. Try fewer words or choose “Everything”.</p>';
   }
 

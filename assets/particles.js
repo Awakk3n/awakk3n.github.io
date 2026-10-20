@@ -1,706 +1,251 @@
-/* THE PRODUCT FIELD — connected-node particle field.
+/* THE PRODUCT FIELD — the particle field: "Reveal".
 
-   One canvas per hero. The file is laid out in four layers so each can change alone:
-     1. CONFIG      every tunable number (density, motion, ranges, per-theme alphas)
-     2. utilities   pure helpers (clamp, seeded random, colour strings)
-     3. createField one self-contained field: simulation → rendering → input → lifecycle
-     4. bootstrap   attach a field to every hero on the page
+   A calm field of drifting points. The network exists only where light falls: under the cursor or finger, on three slow wandering beams,
+   and on a volume whose row you hover (or whose page you are on).
+   - HERO: full strength.  BODY: the same crisp field, very translucent, so it never competes with text (weaker still on chapter pages).
+   - CURSOR: a small soft glow follows the pointer.
+   - TAP / CLICK in the hero is random. It can create particles (a small family that fades away slowly), push them away (they drift back),
+     or destroy some (they fade out). The more crowded the spot, or the more particles exist, the more likely it destroys; destroyed particles
+     are regrown slowly at random places, so the load always settles on its own. A hard cap and a cap of links per particle keep it bounded.
+   - CONTINUOUS: nothing restarts. Every particle has its own speed and character, random gusts pass through, wandering uses non-repeating
+     noise, particles fade at the screen edge instead of popping, and theme changes / resizes / tab switches keep every particle in place.
+   - prefers-reduced-motion: one still image, no loop, no taps.
+   One fixed canvas behind every page (pointer-events: none: it never blocks a click, a selection or scrolling). It starts after the page has
+   loaded, on an idle callback, and fades in.
 
-   Motion is time-based (frame-rate independent), glows are pre-rendered sprites,
-   and a field stops drawing whenever it is off-screen, the tab is hidden, or the
-   reader prefers reduced motion. */
+   Public API: FieldParticles.setVolume(1..3) · .pulse(0..2) · .pause() · .resume() · .stats() */
 (function () {
   'use strict';
+  if (!window.HTMLCanvasElement) return;
 
-  var HOST_SELECTOR = '.hero, .page-hero, .reader-chapter-hero, .a-hero';
-  var hosts = document.querySelectorAll(HOST_SELECTOR);
-  if (!hosts.length || !window.HTMLCanvasElement) return;
-
-  /* ------------------------------------------------------------------ 1. CONFIG */
-  var CONFIG = {
-    maxDpr: 1.5,                    // cap the backing-store resolution
-    referenceFrameMs: 1000 / 60,    // motion constants below are tuned for 60 fps
-    maxFrameMs: 50,                 // clamp long frames so motion never jumps after a stall
-    pointerOff: -999,               // sentinel: pointer is not over the field
-
-    // Node count by hero width: [max width, nodes]. Dust is a fixed share of this.
-    density: [[360, 52], [600, 68], [900, 88], [Infinity, 116]],
-    dustShare: 0.56,
-    nodeCap: 190,
-
-    // Three depth layers. Ranges are [min, span]; `share` is the cumulative roll threshold.
-    layers: [
-      { name: 'far',  share: 0.18, radius: [0.42, 0.42], alpha: [0.28, 0.18], fall: [0.003, 0.007], sway: 0.07,  drift: 0.042, connects: false, halo: 0,    ring: 0    },
-      { name: 'mid',  share: 0.72, radius: [0.68, 0.78], alpha: [0.53, 0.31], fall: [0.005, 0.012], sway: 0.07,  drift: 0.042, connects: true,  halo: 0.16, ring: 0    },
-      { name: 'near', share: 1,    radius: [1.15, 1.25], alpha: [0.78, 0.20], fall: [0.008, 0.018], sway: 0.11,  drift: 0.065, connects: true,  halo: 0.70, ring: 0.27 }
-    ],
-    dust: { radius: [0.24, 0.44], alpha: [0.10, 0.16], fall: [0.002, 0.0055], drift: 0.018 },
-
-    // Three loose constellations the nodes cluster around (normalised to the hero).
-    constellations: [
-      { x: 0.66, y: 0.25, sx: 0.22, sy: 0.29 },
-      { x: 0.83, y: 0.65, sx: 0.22, sy: 0.30 },
-      { x: 0.94, y: 0.38, sx: 0.18, sy: 0.30 }
-    ],
-    clusteredShare: 0.79,
-    xRange: [0.24, 1.08],           // clustered nodes avoid the text column on the left
-
-    links: { reach: [135, 0.26], neighbours: 3, extraEvery: 4, drawRange: [120, 0.23, 225], bridgeBoost: 1.9, curveMax: 0.32 },
-    pointer: { radius: [105, 0.19, 190], push: 0.008, pushNear: 0.016, kick: 0.025, maxVelocity: 0.14, maxVerticalVelocity: 0.045 },
-    burst: { min: 7, spread: 5, lifeSeconds: 4.5, pulseMs: 900, keyboardAt: [0.78, 0.5] },
-
-    // Hero copy sits on the left: dim links/nodes there so the type stays readable.
-    copyZone: { minWidth: 640, edgeStart: 0.04, nodeStart: 0.05, span: 0.34, edgeMobile: 0.92 },
-
-    // Per-theme alphas. Light mode needs stronger strokes to read on a pale ground.
-    theme: {
-      dark: {
-        fallbackRgb: ['131,240,213', '145,178,255', '255,199,124'],
-        link: 0.44, trail: 0.98, ringIdle: 0.20, edgeFloor: 0.28, nodeFloor: 0.28,
-        ambient: [0.09, 0.05], focus: 0.07,
-        hub: { dash: 0.20, inner: 0.09, spoke: 0.26, glow: 0.23, core: 0.92 }
-      },
-      light: {
-        fallbackRgb: ['0,125,104', '49,89,207', '187,84,30'],
-        link: 0.52, trail: 0.96, ringIdle: 0.28, edgeFloor: 0.54, nodeFloor: 0.58,
-        ambient: [0.12, 0.075], focus: 0.09,
-        hub: { dash: 0.27, inner: 0.12, spoke: 0.34, glow: 0.18, core: 0.98 }
-      }
-    }
-  };
-
-  /* --------------------------------------------------------------- 2. utilities */
-  var TAU = Math.PI * 2;
-  var root = document.documentElement;
+  var root = document.documentElement, TAU = Math.PI * 2;
   var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+  function rng(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var rnd = rng((Math.random() * 0x7fffffff) >>> 0);
 
-  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
-  function within(range, roll) { return range[0] + roll * range[1]; }          // [min, span] → value
-  function rgba(rgb, alpha) { return 'rgba(' + rgb + ',' + alpha + ')'; }
-  function token(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+  // seeded Perlin noise: smooth, non-repeating wandering
+  var noise = (function () {
+    var r = rng(7), p = new Uint8Array(512), a = [], i; for (i = 0; i < 256; i++) a.push(i); for (i = 255; i > 0; i--) { var j = Math.floor(r() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } for (i = 0; i < 512; i++) p[i] = a[i & 255];
+    var f = function (t) { return t * t * t * (t * (t * 6 - 15) + 10); }, l = function (a, b, t) { return a + t * (b - a); }, g = function (h, x, y, z) { h &= 15; var u = h < 8 ? x : y, v = h < 4 ? y : (h === 12 || h === 14 ? x : z); return ((h & 1) ? -u : u) + ((h & 2) ? -v : v); };
+    return function (x, y, z) { var X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255; x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z); var u = f(x), v = f(y), w = f(z), A_ = p[X] + Y, AA = p[A_] + Z, AB = p[A_ + 1] + Z, B_ = p[X + 1] + Y, BA = p[B_] + Z, BB = p[B_ + 1] + Z;
+      return l(l(l(g(p[AA], x, y, z), g(p[BA], x - 1, y, z), u), l(g(p[AB], x, y - 1, z), g(p[BB], x - 1, y - 1, z), u), v), l(l(g(p[AA + 1], x, y, z - 1), g(p[BA + 1], x - 1, y, z - 1), u), l(g(p[AB + 1], x, y - 1, z - 1), g(p[BB + 1], x - 1, y - 1, z - 1), u), v), w); };
+  })();
 
-  function hash(text) {
-    var h = 2166136261;
-    for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
-    return h >>> 0;
+  /* ---------------------------------------------------------------- state */
+  var canvas = document.createElement('canvas'); canvas.className = 'field-canvas'; canvas.setAttribute('aria-hidden', 'true');
+  var ctx = canvas.getContext('2d', { alpha: true }); if (!ctx) return;
+  document.body.insertBefore(canvas, document.body.firstChild);
+  // the small cursor glow of the site, in one clipped viewport-sized container (it can never widen the page or allow sideways panning)
+  var lightsEl = document.createElement('div'), cursorEl = document.createElement('div');
+  lightsEl.className = 'field-lights'; lightsEl.setAttribute('aria-hidden', 'true'); cursorEl.className = 'field-cursor'; lightsEl.appendChild(cursorEl); document.body.insertBefore(lightsEl, canvas);
+
+  var pageKind = document.body.classList.contains('reader-body') ? 'reader' : 'other';
+  var hero = document.querySelector('.hero, .page-hero, .reader-chapter-hero');
+  var BODY = pageKind === 'reader' ? .05 : .08, HERO = .82;      // field strength: the hero (a touch below full) and the body (translucent)                 // strength of the field below the hero (translucent)
+  var MAX_BORN = 90, MAX_DEG = 6, HARD_CAP = 560, INTERACTIVE = 'a, button, input, select, textarea, label, summary, kbd, [role="button"]';
+  var W = 1, H = 1, dpr = 1, t = 0, dark = true, rgb = ['130,224,202', '136,169,255', '243,189,117'], pts = [];
+  var rv = new Float32Array(0), hw = new Float32Array(0), ef = new Float32Array(0), deg = new Uint8Array(0), nxt = new Int32Array(0), head = new Int32Array(0);
+  var P = { x: -999, y: -999, gx: -999, gy: -999, active: false, touch: false, a: 0 };
+  var scrollY = window.pageYOffset || 0, lastScroll = scrollY, heroBottom = 600, heroTop = 0, hubs = [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }];
+  var hoverGroup = -1, volumeFocus = -1, focusE = [0, 0, 0], flashes = [], gusts = [], nextGust = 1500, taps = 0, lastTap = -1e9, lastBirth = 0, wantBase = 0, edgeCount = 0;
+  var reduced = !!(motionQuery && motionQuery.matches), booted = false, destroyed = false, paused = false, raf = 0, last = 0, cost = 0, fps = 60;
+  var BS = []; for (var q = 0; q < 18; q++) BS.push([]);
+
+  function palette() {
+    var cs = getComputedStyle(root); dark = root.dataset.theme !== 'light';
+    rgb = ['--a1-rgb', '--a2-rgb', '--a3-rgb'].map(function (n, i) { var v = cs.getPropertyValue(n).trim(); return v ? v.replace(/\s+/g, '') : rgb[i]; });
   }
-  function seededRandom(seed) {
-    var x = seed >>> 0;
-    return function () { x = (Math.imul(1664525, x) + 1013904223) >>> 0; return x / 4294967296; };
-  }
-  function bellCurve(random) { return (random() + random() + random() - 1.5) * 1.42; }
+  function ink(a) { return dark ? 'rgba(190,210,222,' + a + ')' : 'rgba(23,42,37,' + a + ')'; }
+  function col(i, a) { return 'rgba(' + rgb[i] + ',' + a + ')'; }
+  function wantCount() { var weak = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2; return Math.round(clamp(W * H / 4200, 110, 380) * (weak ? .7 : 1)); }
+  // every particle has its own character: speed, how fast its path changes, jitter, and a private slice of the noise field
+  var uid = 0, edges = new Map(), frameK = 1, SPEED = .72, maxLink = 0;     // SPEED: overall pace of the field
+  function makePoint(fadeIn) { return { id: ++uid, x: rnd() * W, y: rnd() * H, vx: 0, vy: 0, r: .7 + rnd() * 1.3, g: Math.floor(rnd() * 3), fade: fadeIn ? 0 : 1, die: false, born: false, bornAt: 0, ttl: 0, spd: .55 + rnd() * 1.1, wob: .5 + rnd() * 1.6, zo: rnd() * 200, tw: .004 + rnd() * .012 }; }
+  function ensure(n) { if (rv.length >= n) return; var m = Math.ceil(n * 1.5) + 64; rv = new Float32Array(m); hw = new Float32Array(m); ef = new Float32Array(m); deg = new Uint8Array(m); nxt = new Int32Array(m); }
 
-  function densityFor(width) {
-    for (var i = 0; i < CONFIG.density.length; i++) if (width < CONFIG.density[i][0]) return CONFIG.density[i][1];
-    return CONFIG.density[CONFIG.density.length - 1][1];
+  function size() {
+    var ow = W, oh = H; dpr = Math.min(window.devicePixelRatio || 1, 1.5); W = canvas.clientWidth || window.innerWidth; H = canvas.clientHeight || window.innerHeight;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (pts.length && ow > 1) for (var i = 0; i < pts.length; i++) { pts[i].x *= W / ow; pts[i].y *= H / oh; }          // keep every point where it was
+    var base = pts.filter(function (p) { return !p.die && !p.born; }); wantBase = wantCount();
+    for (i = base.length; i < wantBase; i++) pts.push(makePoint(pts.length > 0));
+    for (i = wantBase; i < base.length; i++) base[i].die = true;
+    ensure(pts.length);
   }
-
-  /* Colours come from the design tokens, so the field always matches the theme. */
-  function readPalette() {
-    var theme = root.dataset.theme === 'light' ? 'light' : 'dark';
-    var alphas = CONFIG.theme[theme];
-    var names = ['--a1', '--a2', '--a3'];
-    var rgbNames = ['--a1-rgb', '--a2-rgb', '--a3-rgb'];
-    return {
-      light: theme === 'light',
-      a: alphas,
-      colors: names.map(function (name, i) { return token(name) || 'rgb(' + alphas.fallbackRgb[i] + ')'; }),
-      rgb: rgbNames.map(function (name, i) { return token(name) || alphas.fallbackRgb[i]; })
-    };
+  function geometry() {
+    if (!hero) { heroBottom = 0; return; }
+    var r = hero.getBoundingClientRect(); heroBottom = r.bottom; heroTop = r.top;
+    [[.66, .30], [.84, .68], [.95, .40]].forEach(function (f, i) { hubs[i].x = r.left + f[0] * r.width; hubs[i].y = r.top + f[1] * r.height; });
   }
 
-  /* A radial glow drawn once to an off-screen canvas. Re-using it with drawImage is far
-     cheaper than creating a gradient per node per frame. `stops` = [[position, alpha]…]. */
-  function makeGlowSprite(rgb, radius, stops, dpr) {
-    var size = Math.max(2, Math.ceil(radius * 2 * dpr));
-    var sprite = document.createElement('canvas');
-    sprite.width = sprite.height = size;
-    var g = sprite.getContext('2d');
-    var gradient = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    stops.forEach(function (stop) { gradient.addColorStop(stop[0], rgba(rgb, stop[1])); });
-    g.fillStyle = gradient;
-    g.fillRect(0, 0, size, size);
-    return { image: sprite, radius: radius };
+  /* ----------------------------------------------------------- simulation */
+  function step(dt) {
+    var k = dt / 16.7, i, p, g, dS = scrollY - lastScroll; lastScroll = scrollY;
+    P.a += ((P.active ? 1 : 0) - P.a) * (1 - Math.pow(P.active ? .88 : .94, k));
+    if (P.gx < -500) { P.gx = P.x; P.gy = P.y; } P.gx += (P.x - P.gx) * (1 - Math.pow(.78, k)); P.gy += (P.y - P.gy) * (1 - Math.pow(.78, k));
+    var active = hoverGroup >= 0 ? hoverGroup : volumeFocus;
+    for (i = 0; i < 3; i++) focusE[i] += ((i === active ? (hoverGroup === i ? 1 : .6) : 0) - focusE[i]) * (1 - Math.pow(.9, k));
+    for (i = flashes.length - 1; i >= 0; i--) { flashes[i].a *= Math.exp(-dt / 900); if (flashes[i].a < .02) flashes.splice(i, 1); }
+    // random gusts: now and then a soft breath passes through a random part of the field
+    if (t > nextGust) { var ga = rnd() * TAU; gusts.push({ x: rnd() * W, y: rnd() * H, dx: Math.cos(ga), dy: Math.sin(ga), R: 180 + rnd() * 220, s: .1 + rnd() * .22, a: 1 }); nextGust = t + 1500 + rnd() * 3500; }
+    for (i = gusts.length - 1; i >= 0; i--) { gusts[i].a *= Math.exp(-dt / 1400); if (gusts[i].a < .05) gusts.splice(i, 1); }
+    var baseAlive = 0;
+    for (i = pts.length - 1; i >= 0; i--) {
+      p = pts[i]; if (!p.die && !p.born) baseAlive++;
+      var ang = noise(p.x * .0015, p.y * .0015, t * .00003 * p.wob + p.zo) * TAU * 1.6, sp = (.1 + .09 * (noise(p.x * .003 + 9, p.y * .003, t * .00004 + p.zo) * .5 + .5)) * p.spd * SPEED;
+      p.vx += (Math.cos(ang) * sp - p.vx) * .016 * k + (rnd() - .5) * p.tw * k; p.vy += (Math.sin(ang) * sp * .8 - p.vy) * .016 * k + (rnd() - .5) * p.tw * k;
+      for (g = 0; g < gusts.length; g++) { var G = gusts[g], gx = p.x - G.x, gy = p.y - G.y, gd = gx * gx + gy * gy; if (gd < G.R * G.R) { var f = (1 - Math.sqrt(gd) / G.R) * G.s * G.a * .05 * k; p.vx += G.dx * f; p.vy += G.dy * f; } }
+      p.x += p.vx * k; p.y += p.vy * k - dS * .16;
+      if (p.x < -50) p.x += W + 100; else if (p.x > W + 50) p.x -= W + 100; if (p.y < -50) p.y += H + 100; else if (p.y > H + 50) p.y -= H + 100;
+      if (p.born && !p.die && t - p.bornAt > p.ttl) p.die = true;                      // tap-born particles live a while, then fade out
+      p.fade += ((p.die ? 0 : 1) - p.fade) * (1 - Math.pow(.97, k)); if (p.die && p.fade < .01) pts.splice(i, 1);
+    }
+    if (baseAlive < wantBase && t - lastBirth > 90 && pts.length < HARD_CAP) { pts.push(makePoint(true)); lastBirth = t; }   // regrow the normal population, slowly, at random places
   }
 
-  function drawSprite(ctx, sprite, x, y, alpha) {
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(sprite.image, x - sprite.radius, y - sprite.radius, sprite.radius * 2, sprite.radius * 2);
+  // A tap is random: create, push away or destroy. The more crowded the spot (or the more particles exist), the more likely it destroys.
+  function tap(x, y) {
+    if (t - lastTap < 110) return; lastTap = t;
+    taps++; flashes.push({ x: x, y: y, a: 1 }); if (flashes.length > 5) flashes.shift();
+    var near = 0, alive = 0, R2 = 150 * 150;
+    for (var i = 0; i < pts.length; i++) { var p = pts[i]; if (p.die) continue; alive++; var dx = p.x - x, dy = p.y - y; if (dx * dx + dy * dy < R2) near++; }
+    var load = clamp((alive - wantBase) / MAX_BORN, 0, 1), crowd = Math.max(clamp((near - 8) / 14, 0, 1), load);
+    var pDestroy = .12 + .55 * crowd, pMultiply = (1 - pDestroy) * (.55 - .45 * crowd), roll = rnd();
+    if (roll < pDestroy) destroy(x, y, crowd); else if (roll < pDestroy + pMultiply) multiply(x, y); else scatter(x, y);
+  }
+  function destroy(x, y, crowd) {
+    var radius = 170 + rnd() * 110, fraction = Math.min(.95, .3 + .4 * rnd() + .25 * crowd);
+    for (var i = 0; i < pts.length; i++) { var p = pts[i]; if (p.die) continue; var d = Math.hypot(p.x - x, p.y - y); if (d < radius && rnd() < fraction * (1 - .5 * d / radius)) p.die = true; }   // they fade out, nothing pops
+  }
+  function multiply(x, y) {
+    var count = Math.min(6 + Math.floor(rnd() * 8), Math.max(0, HARD_CAP - pts.length)), born = pts.filter(function (p) { return p.born && !p.die; });
+    for (var o = 0; o < born.length - (MAX_BORN - count); o++) born[o].die = true;
+    var spread = 40 + rnd() * 60;
+    for (var i = 0; i < count; i++) {
+      var a = rnd() * TAU, d = Math.sqrt(rnd()) * spread, p = makePoint(true), v = .05 + rnd() * .2;
+      p.x = x + Math.cos(a) * d; p.y = y + Math.sin(a) * d; p.g = rnd() < .6 ? taps % 3 : Math.floor(rnd() * 3); p.born = true; p.bornAt = t; p.ttl = 12000 + rnd() * 12000; p.vx = Math.cos(a) * v; p.vy = Math.sin(a) * v;
+      pts.push(p);
+    }
+  }
+  function scatter(x, y) {
+    var strength = 3 + rnd() * 4.5, radius = 200 + rnd() * 130;
+    for (var i = 0; i < pts.length; i++) { var p = pts[i], dx = p.x - x, dy = p.y - y, d = Math.hypot(dx, dy); if (d < radius && d > 1) { var f = 1 - d / radius; p.vx += dx / d * f * f * strength; p.vy += dy / d * f * f * strength; } }
   }
 
-  /* --------------------------------------------------------------- 3. createField */
-  function createField(host, index) {
-    var canvas = host.querySelector('.particle-layer');
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvas.className = 'particle-layer';
-      host.insertBefore(canvas, host.firstChild);
+  /* -------------------------------------------------------------- drawing */
+  function render(still) {
+    var n = pts.length, i, j, b, p, lights = []; ensure(n);
+    lights.push({ x: W * (.5 + .42 * noise(t * .00005, 1.5, 3)), y: H * (.45 + .32 * noise(t * .00006, 8.5, 5)), R: 360, w: .95 });
+    lights.push({ x: W * (.55 + .4 * noise(t * .00004, 4.5, 7)), y: H * (.5 + .34 * noise(t * .00006, 12.5, 2)), R: 320, w: .85 });
+    lights.push({ x: W * (.45 + .4 * noise(t * .00004, 6.5, 9)), y: H * (.4 + .3 * noise(t * .00005, 2.5, 4)), R: 300, w: .8 });
+    if (P.a > .02) lights.push({ x: P.gx, y: P.gy, R: P.touch ? 230 : 300, w: P.a });
+    for (i = 0; i < 3; i++) if (focusE[i] > .02) lights.push({ x: hubs[i].x, y: hubs[i].y, R: 300, w: focusE[i] });
+    for (i = 0; i < flashes.length; i++) lights.push({ x: flashes[i].x, y: flashes[i].y, R: 250, w: flashes[i].a });
+    for (i = 0; i < n; i++) {
+      p = pts[i]; var m = 0; for (j = 0; j < lights.length; j++) { var L = lights[j], d = Math.hypot(p.x - L.x, p.y - L.y), v = Math.pow(Math.max(0, 1 - d / L.R), 1.5) * L.w; if (v > m) m = v; }
+      rv[i] = m; hw[i] = BODY + (HERO - BODY) * clamp((heroBottom - p.y) / 150, 0, 1);      // hero = HERO, body = translucent
+      ef[i] = clamp(Math.min(p.x, W - p.x, p.y, H - p.y) / 70, 0, 1) * p.fade; deg[i] = 0;
     }
-    var ctx = canvas.getContext('2d', { alpha: true });
-    if (!ctx) return null;
-
-    canvas.removeAttribute('aria-hidden');
-    canvas.setAttribute('role', 'button');
-    canvas.setAttribute('tabindex', '0');
-    canvas.setAttribute('aria-label', 'Interactive particle field. Click or press Enter to create a particle burst.');
-    canvas.setAttribute('title', 'Click to create a particle burst');
-
-    /* --- state --- */
-    // Layout stays coherent within a visit but differs between visits.
-    var seedSource = String(host.getAttribute('data-particle-seed') || host.id || host.className || 'field-' + index);
-    var random = seededRandom((hash(seedSource) ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0);
-
-    var palette = readPalette();
-    var width = 1, height = 1, dpr = 1;
-    var nodes = [], dust = [], edges = [], hubs = [];
-    var edgeKeys = Object.create(null), nextNodeId = 1;
-    var sprites = {};
-    var linkReach = 150, pointerReach = 150, burstCount = 0, elapsed = 0, lastTime = 0;
-    var pulse = null;
-    var pointer = { x: CONFIG.pointerOff, y: CONFIG.pointerOff, tx: CONFIG.pointerOff, ty: CONFIG.pointerOff };
-    var rafId = 0, onScreen = true, reduced = !!(motionQuery && motionQuery.matches), destroyed = false;
-
-    /* --- creation --- */
-    function pickLayer(roll) {
-      for (var i = 0; i < CONFIG.layers.length; i++) if (roll < CONFIG.layers[i].share) return i;
-      return CONFIG.layers.length - 1;
-    }
-
-    function createNode(spawnAt) {
-      var layerIndex = pickLayer(random()), layer = CONFIG.layers[layerIndex];
-      var group = -1, nx, ny;
-      if (spawnAt) {
-        nx = spawnAt.x / width; ny = spawnAt.y / height;
-      } else if (random() < CONFIG.clusteredShare) {
-        var roll = random();
-        group = roll < 0.34 ? 0 : (roll < 0.69 ? 1 : 2);
-        var c = CONFIG.constellations[group];
-        nx = clamp(c.x + bellCurve(random) * c.sx, CONFIG.xRange[0], CONFIG.xRange[1]);
-        ny = clamp(c.y + bellCurve(random) * c.sy, -0.10, 1.10);
-      } else {
-        nx = 0.26 + random() * 0.82;
-        ny = -0.02 + random() * 1.04;
-      }
-      return {
-        id: nextNodeId++,
-        nx: nx, ny: ny, x: nx * width, y: ny * height,
-        layer: layerIndex, group: group, color: Math.floor(random() * 3),
-        radius: within(layer.radius, random()), alpha: within(layer.alpha, random()),
-        connects: layer.connects, halo: random() < layer.halo, ring: random() < layer.ring,
-        phase: random() * TAU, speed: 0.16 + random() * 0.48,
-        vx: (random() - 0.5) * layer.sway, drift: (random() - 0.5) * layer.drift,
-        fall: within(layer.fall, random()), kick: 0, parallax: 0.32 + random(),
-        spawned: !!spawnAt, burst: !!spawnAt, expired: false,
-        born: performance.now(), life: spawnAt ? 1 : 0
-      };
-    }
-
-    function createDust() {
-      var d = CONFIG.dust, tint = random();
-      return {
-        nx: 0.18 + random() * 0.88, ny: random(), x: 0, y: 0,
-        radius: within(d.radius, random()), alpha: within(d.alpha, random()),
-        fall: within(d.fall, random()), drift: (random() - 0.5) * d.drift, phase: random() * TAU,
-        color: tint > 0.84 ? 2 : (tint > 0.60 ? 1 : 0)
-      };
-    }
-
-    /* Edge identity is based on stable node IDs, not array positions. This keeps
-       existing links visually stable when a burst adds or removes nodes. */
-    function addEdge(a, b, extra) {
-      if (a === b || !nodes[a] || !nodes[b]) return;
-      var lo = Math.min(a, b), hi = Math.max(a, b);
-      var firstId = nodes[lo].id, secondId = nodes[hi].id;
-      var key = Math.min(firstId, secondId) + ':' + Math.max(firstId, secondId);
-      if (edgeKeys[key]) return;
-      edgeKeys[key] = true;
-
-      var edgeRandom = seededRandom(hash(key));
-      edges.push(Object.assign({
-        a: lo, b: hi, key: key,
-        bend: (edgeRandom() - 0.5) * 0.42,
-        phase: edgeRandom(), speed: 0.035 + edgeRandom() * 0.07,
-        signal: edgeRandom() > 0.46,
-        bridge: nodes[lo].group !== nodes[hi].group
-      }, extra || {}));
-    }
-
-    /* Initial/resized topology only. Clicks use connectBurstNode() instead, so
-       the established constellation never gets torn down and randomly redrawn. */
-    function buildTopology() {
-      edges = [];
-      edgeKeys = Object.create(null);
-      var reach = Math.max(CONFIG.links.reach[0], width * CONFIG.links.reach[1]);
-
-      nodes.forEach(function (a, i) {
-        if (!a.connects) return;
-        var near = [];
-        nodes.forEach(function (b, j) {
-          if (i === j || !b.connects) return;
-          var dx = (a.nx - b.nx) * width, dy = (a.ny - b.ny) * height, d2 = dx * dx + dy * dy;
-          if (d2 < reach * reach) near.push({ j: j, d2: d2 });
-        });
-        near.sort(function (p, q) { return p.d2 - q.d2; });
-        near.slice(0, CONFIG.links.neighbours + (i % CONFIG.links.extraEvery === 0 ? 1 : 0))
-          .forEach(function (n) { addEdge(i, n.j); });
-      });
-
-      [[0, 1], [1, 2], [0, 2]].forEach(function (pair, k) {
-        var best = null;
-        nodes.forEach(function (a, i) {
-          if (a.group !== pair[0] || !a.connects) return;
-          nodes.forEach(function (b, j) {
-            if (b.group !== pair[1] || !b.connects) return;
-            var dx = (a.nx - b.nx) * width, dy = (a.ny - b.ny) * height, d2 = dx * dx + dy * dy;
-            if (!best || d2 < best.d2) best = { i: i, j: j, d2: d2 };
-          });
-        });
-        if (best) addEdge(best.i, best.j, { bend: k % 2 ? 0.28 : -0.24, phase: 0.13 + k * 0.23, speed: 0.028, signal: true, bridge: true });
-      });
-    }
-
-    /* Add links only for the new node. Existing edges and their animation phases
-       are left untouched, avoiding the visual graph reset that caused click jitter. */
-    function connectBurstNode(index) {
-      var node = nodes[index];
-      if (!node) return;
-      var reach = Math.max(CONFIG.links.reach[0], width * CONFIG.links.reach[1]) * CONFIG.links.bridgeBoost;
-      var candidates = [];
-      nodes.forEach(function (other, otherIndex) {
-        if (otherIndex === index || !other.connects) return;
-        var dx = node.x - other.x, dy = node.y - other.y, d2 = dx * dx + dy * dy;
-        if (d2 < reach * reach) candidates.push({ index: otherIndex, d2: d2 });
-      });
-      candidates.sort(function (a, b) { return a.d2 - b.d2; });
-      candidates.slice(0, CONFIG.links.neighbours).forEach(function (candidate) {
-        addEdge(index, candidate.index);
-      });
-    }
-
-    /* Expired burst nodes are removed without rebuilding the remaining graph. */
-    function removeNodeAt(index) {
-      var kept = [];
-      edges.forEach(function (edge) {
-        if (edge.a === index || edge.b === index) {
-          delete edgeKeys[edge.key];
-          return;
-        }
-        if (edge.a > index) edge.a--;
-        if (edge.b > index) edge.b--;
-        kept.push(edge);
-      });
-      edges = kept;
-      nodes.splice(index, 1);
-    }
-
-    function pruneExpiredNodes() {
-      for (var i = nodes.length - 1; i >= 0; i--) {
-        if (nodes[i].expired) removeNodeAt(i);
-      }
-    }
-
-    /* --- sizing --- */
-    function buildSprites() {
-      var rgb = palette.rgb, a = palette.a;
-      sprites = { aura: [] };
-      for (var c = 0; c < 3; c++) {
-        sprites.aura.push({
-          near:  makeGlowSprite(rgb[c], 27, [[0, 0.24], [0.38, 0.075], [1, 0]], dpr),
-          mid:   makeGlowSprite(rgb[c], 15, [[0, 0.12], [0.38, 0.035], [1, 0]], dpr),
-          burst: makeGlowSprite(rgb[c], 20, [[0, 0.26], [0.38, 0.10],  [1, 0]], dpr)
-        });
-      }
-      sprites.tail = makeGlowSprite(rgb[0], 12, [[0, 1], [1, 0]], dpr);
-      hubs.forEach(function (hub) {
-        hub.glow = makeGlowSprite(rgb[hub.color], hub.glowRadius, [[0, a.hub.glow], [1, 0]], dpr);
-      });
-    }
-
-    function layoutHubs() {
-      hubs = CONFIG.constellations.map(function (c, i) {
-        var rx = Math.max(25, Math.min(width * (i === 2 ? 0.095 : 0.13), 160));
-        var ry = Math.max(28, Math.min(height * (i === 1 ? 0.19 : 0.16), 118));
-        return { x: width * c.x, y: height * c.y, rx: rx, ry: ry, color: i, phase: i * 1.8, glowRadius: Math.max(22, rx * 0.48) };
-      });
-    }
-
-    function reconcileDensity() {
-      var wanted = densityFor(width), base = nodes.filter(function (n) { return !n.spawned; });
-      while (base.length < wanted) { var n = createNode(); nodes.push(n); base.push(n); }
-      while (base.length > wanted) { nodes.splice(nodes.lastIndexOf(base.pop()), 1); }
-      var wantedDust = Math.round(wanted * CONFIG.dustShare);
-      while (dust.length < wantedDust) dust.push(createDust());
-      dust.length = Math.min(dust.length, wantedDust);
-    }
-
-    function resize() {
-      if (destroyed) return;
-      var nextW = Math.max(1, host.clientWidth), nextH = Math.max(1, host.clientHeight);
-      if (nextW === width && nextH === height && nodes.length) return;
-      if (pulse && width > 1) { pulse.x *= nextW / width; pulse.y *= nextH / height; }
-      width = nextW; height = nextH;
-      dpr = Math.min(window.devicePixelRatio || 1, CONFIG.maxDpr);
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      reconcileDensity();
-      nodes.forEach(function (p) { p.x = p.nx * width; p.y = p.ny * height; });
-      dust.forEach(function (p) { p.x = p.nx * width; p.y = p.ny * height; });
-      linkReach = clamp(width * CONFIG.links.drawRange[1], CONFIG.links.drawRange[0], CONFIG.links.drawRange[2]);
-      pointerReach = clamp(width * CONFIG.pointer.radius[1], CONFIG.pointer.radius[0], CONFIG.pointer.radius[2]);
-      layoutHubs();
-      buildSprites();
-      buildTopology();
-      render(true);
-      schedule();
-    }
-
-    /* --- simulation (k = elapsed frames at 60 fps, so motion is refresh-rate independent) --- */
-    function step(now) {
-      var dt = lastTime ? clamp(now - lastTime, 0, CONFIG.maxFrameMs) : CONFIG.referenceFrameMs;
-      lastTime = now;
-      elapsed += dt;
-      var k = dt / CONFIG.referenceFrameMs;
-
-      // Pointer coordinates are authoritative; no lagging target interpolation.
-      pointer.x = pointer.tx;
-      pointer.y = pointer.ty;
-      for (var d = 0; d < dust.length; d++) move(dust[d], now, k, true);
-      for (var n = 0; n < nodes.length; n++) move(nodes[n], now, k, false);
-      pruneExpiredNodes();
-    }
-
-    function move(p, now, k, isDust) {
-      if (!isDust) {
-        p.vx = p.vx * Math.pow(0.992, k) + Math.sin(now * 0.00016 + p.phase) * 0.0009 * k;
-        if (pointer.x >= 0) {
-          var dx = p.x - pointer.x, dy = p.y - pointer.y, dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist > 1 && dist < pointerReach) {
-            var force = (1 - dist / pointerReach) * (p.layer === 2 ? CONFIG.pointer.pushNear : CONFIG.pointer.push) * p.parallax * k;
-            p.vx = clamp(p.vx + dx / dist * force, -CONFIG.pointer.maxVelocity, CONFIG.pointer.maxVelocity);
-            p.kick = clamp(p.kick + dy / dist * force * CONFIG.pointer.kick, -CONFIG.pointer.maxVerticalVelocity, CONFIG.pointer.maxVerticalVelocity);
-          }
-        }
-        if (p.burst) {
-          p.life = Math.max(0, 1 - (now - p.born) / 1000 / CONFIG.burst.lifeSeconds);
-          if (p.life <= 0) { p.burst = false; p.expired = true; }
-        }
-      }
-      var sway = Math.sin(now * 0.00013 + p.phase) * (isDust ? 0.004 : 0.012) * (p.parallax || 0.5);
-      p.x += ((p.vx || 0) + p.drift + sway) * k;
-      p.y += (p.fall + (p.kick || 0)) * k;
-      p.kick = (p.kick || 0) * Math.pow(0.92, k);
-      if (p.x < -24) p.x = width + 16; else if (p.x > width + 24) p.x = -16;
-      if (p.y > height + 18) { p.y = -12; p.x = clamp(p.x + Math.sin(p.phase) * width * 0.1, -8, width + 8); }
-      p.nx = p.x / width; p.ny = p.y / height;
-    }
-
-    /* --- rendering --- */
-    function drawAmbient() {
-      var a = palette.a, rgb = palette.rgb;
-      var gx = pointer.x >= 0 ? pointer.x / width : 0.78, gy = pointer.y >= 0 ? pointer.y / height : 0.45;
-      var cx = width * clamp(gx, 0.1, 1), cy = height * clamp(gy, 0.05, 0.95), r = Math.max(width * 0.5, 240);
-      var glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      glow.addColorStop(0, rgba(rgb[1], a.ambient[0]));
-      glow.addColorStop(0.36, rgba(rgb[0], a.ambient[1]));
-      glow.addColorStop(1, rgba(rgb[0], 0));
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = glow;
-      ctx.fillRect(0, 0, width, height);
-    }
-
-    function drawHubs(t) {
-      var h = palette.a.hub, rgb = palette.rgb;
-      hubs.forEach(function (hub, i) {
-        var col = rgb[hub.color];
-        ctx.save();
-        ctx.translate(hub.x, hub.y);
-        ctx.rotate((i === 1 ? -0.3 : 0.18) + Math.sin(t * 0.035 + hub.phase) * 0.03);
-        ctx.lineWidth = 0.8;
-        ctx.globalAlpha = 1;
-        ctx.strokeStyle = rgba(col, h.dash);
-        ctx.setLineDash([Math.max(4, hub.rx * 0.10), Math.max(6, hub.rx * 0.13)]);
-        ctx.beginPath(); ctx.ellipse(0, 0, hub.rx, hub.ry, 0, 0.1 + i * 0.3, 2.6 + i * 0.38); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.strokeStyle = rgba(col, h.inner);
-        ctx.beginPath(); ctx.ellipse(0, 0, hub.rx * 0.64, hub.ry * 0.65, 0, 3.3, 5.85); ctx.stroke();
-        ctx.strokeStyle = rgba(col, h.spoke);
-        for (var s = 0; s < 3; s++) {
-          var angle = t * 0.022 + hub.phase + s * TAU / 3;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(angle) * hub.rx * 0.9, Math.sin(angle) * hub.ry * 0.9);
-          ctx.lineTo(Math.cos(angle) * hub.rx, Math.sin(angle) * hub.ry);
-          ctx.stroke();
-        }
-        ctx.restore();
-        drawSprite(ctx, hub.glow, hub.x, hub.y, 1);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = rgba(col, h.core);
-        ctx.beginPath(); ctx.arc(hub.x, hub.y, 2.3, 0, TAU); ctx.fill();
-      });
-    }
-
-    function drawDust(t) {
-      for (var i = 0; i < dust.length; i++) {
-        var s = dust[i], twinkle = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(t * 0.28 + s.phase));
-        ctx.globalAlpha = s.alpha * twinkle;
-        ctx.fillStyle = palette.colors[s.color];
-        ctx.beginPath(); ctx.arc(s.x, s.y, s.radius, 0, TAU); ctx.fill();
-      }
-    }
-
-    function drawEdges(t, still) {
-      var a = palette.a, zone = CONFIG.copyZone, wide = width > zone.minWidth;
-      for (var i = 0; i < edges.length; i++) {
-        var edge = edges[i], from = nodes[edge.a], to = nodes[edge.b];
-        if (!from || !to) continue;
-        var dx = to.x - from.x, dy = to.y - from.y, dist = Math.sqrt(dx * dx + dy * dy);
-        var maxD = linkReach * (edge.bridge ? CONFIG.links.bridgeBoost : 1.38);
-        if (dist > maxD) continue;
-        var proximity = clamp(1 - dist / maxD, 0, 1);
-        var depth = 0.52 + ((from.layer + to.layer) / 4) * 0.42;
-        var copyFade = wide ? clamp((Math.min(from.x, to.x) / width - zone.edgeStart) / zone.span, a.edgeFloor, 1) : zone.edgeMobile;
-        var bend = edge.bend * Math.min(dist, width * CONFIG.links.curveMax);
-        var cx = (from.x + to.x) / 2 - dy / Math.max(1, dist) * bend;
-        var cy = (from.y + to.y) / 2 + dx / Math.max(1, dist) * bend;
-
-        ctx.globalAlpha = proximity * a.link * depth * copyFade * (edge.bridge ? 0.92 : 1);
-        ctx.strokeStyle = edge.bridge ? palette.colors[1] : palette.colors[(from.color + to.color) % 3];
-        ctx.lineWidth = edge.bridge ? 1.05 : ((from.layer === 2 || to.layer === 2) ? 0.85 : 0.62);
-        ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.quadraticCurveTo(cx, cy, to.x, to.y); ctx.stroke();
-
-        if (!still && edge.signal && proximity > 0.12) drawSignal(edge, from, to, cx, cy, t, proximity, copyFade);
-      }
-    }
-
-    function drawSignal(edge, from, to, cx, cy, t, proximity, copyFade) {
-      var u = (t * edge.speed + edge.phase) % 1, pulseStrength = Math.sin(u * Math.PI);
-      if (pulseStrength <= 0.1) return;
-      var mt = 1 - u;
-      var x = mt * mt * from.x + 2 * mt * u * cx + u * u * to.x;
-      var y = mt * mt * from.y + 2 * mt * u * cy + u * u * to.y;
-      var strength = (pulseStrength - 0.1) / 0.9 * palette.a.trail * proximity * copyFade;
-      ctx.globalAlpha = strength;
-      ctx.fillStyle = palette.colors[0];
-      ctx.beginPath(); ctx.arc(x, y, 1.6, 0, TAU); ctx.fill();
-      drawSprite(ctx, sprites.tail, x, y, strength * 0.5);
-    }
-
-    function drawNodes(t) {
-      var a = palette.a, zone = CONFIG.copyZone, wide = width > zone.minWidth;
-      for (var i = 0; i < nodes.length; i++) {
-        var p = nodes[i];
-        var shimmer = 0.82 + 0.18 * (0.5 + 0.5 * Math.sin(t * p.speed + p.phase));
-        var fade = wide ? clamp((p.x / width - zone.nodeStart) / zone.span, a.nodeFloor, 1) : 1;
-        var life = p.burst ? p.life : 1;
-
-        if (p.halo || p.burst) {
-          var tier = p.burst ? 'burst' : (p.layer === 2 ? 'near' : 'mid');
-          drawSprite(ctx, sprites.aura[p.color][tier], p.x, p.y, fade * life);
-        }
-        ctx.globalAlpha = p.alpha * shimmer * fade * life;
-        ctx.fillStyle = palette.colors[p.color];
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * (p.burst ? 1.15 : 1), 0, TAU); ctx.fill();
-
-        if (p.ring || p.burst) {
-          ctx.globalAlpha = (p.burst ? 0.62 : a.ringIdle) * fade * life;
-          ctx.strokeStyle = palette.colors[p.color];
-          ctx.lineWidth = p.burst ? 1.1 : 0.8;
-          ctx.beginPath(); ctx.arc(p.x, p.y, (p.burst ? 5 : 7) + Math.sin(t * 0.6 + p.phase) * 1.4, 0, Math.PI * 1.8); ctx.stroke();
+    // neighbour search on a grid, with a cap on links per particle: dense clusters stay legible and the cost stays bounded
+    var C = 165, C2 = C * C, gain = dark ? 1.55 : 1.75, cols = Math.ceil(W / C) + 1, rows = Math.ceil(H / C) + 1, guard;
+    if (head.length < cols * rows) head = new Int32Array(cols * rows); head.fill(-1, 0, cols * rows);
+    for (i = 0; i < n; i++) { var cx = clamp(Math.floor(pts[i].x / C), 0, cols - 1), cy = clamp(Math.floor(pts[i].y / C), 0, rows - 1); nxt[i] = head[cy * cols + cx]; head[cy * cols + cx] = i; }
+    for (b = 0; b < 18; b++) BS[b].length = 0; edgeCount = 0;
+    // 1) collect every possible bond this frame; 2) bonds that already exist get the link slots first (so they do not flip on and off);
+    // 3) every bond eases its brightness toward its target: in fairly slowly, out more slowly still, so bonds form and dissolve softly
+    var cand = render.cand || (render.cand = []); cand.length = 0;
+    for (i = 0; i < n; i++) {
+      if (ef[i] < .02) continue; var pi = pts[i], ci = clamp(Math.floor(pi.x / C), 0, cols - 1), ri = clamp(Math.floor(pi.y / C), 0, rows - 1);
+      for (var yy = Math.max(0, ri - 1); yy <= Math.min(rows - 1, ri + 1); yy++) for (var xx = Math.max(0, ci - 1); xx <= Math.min(cols - 1, ci + 1); xx++) {
+        for (j = head[yy * cols + xx], guard = 0; j !== -1 && j !== undefined && guard < n; j = nxt[j], guard++) {          // the guard makes an endless loop impossible
+          if (j <= i) continue; var dx = pi.x - pts[j].x, dy = pi.y - pts[j].y, d2 = dx * dx + dy * dy; if (d2 > C2) continue;
+          var a = (1 - Math.sqrt(d2) / C) * (rv[i] + rv[j]) * .5 * gain * Math.min(ef[i], ef[j]) * (hw[i] + hw[j]) * .5; if (a < .02) continue;
+          cand.push(i, j, a);
         }
       }
     }
-
-    function drawPointerFocus() {
-      if (pointer.x < 0) return;
-      var r = pointerReach * 0.7;
-      var focus = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, r);
-      focus.addColorStop(0, rgba(palette.rgb[0], palette.a.focus));
-      focus.addColorStop(1, rgba(palette.rgb[0], 0));
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = focus;
-      ctx.fillRect(pointer.x - pointerReach, pointer.y - pointerReach, pointerReach * 2, pointerReach * 2);
+    var e, key, pass, x;
+    for (e of edges.values()) e.tg = 0;
+    for (pass = 0; pass < 2; pass++) for (x = 0; x < cand.length; x += 3) {
+      i = cand[x]; j = cand[x + 1]; if (deg[i] >= MAX_DEG || deg[j] >= MAX_DEG) continue;
+      var A = pts[i], B = pts[j]; key = A.id < B.id ? A.id * 2097152 + B.id : B.id * 2097152 + A.id; e = edges.get(key);
+      if ((pass === 0) !== !!e) continue;                                   // pass 0: existing bonds, pass 1: new ones
+      if (!e) { e = { a: A, b: B, g: A.g, al: still ? cand[x + 2] : 0, tg: 0 }; edges.set(key, e); }
+      e.tg = cand[x + 2]; deg[i]++; deg[j]++;
     }
-
-    function drawPulse(now, still) {
-      if (!pulse) return;
-      var age = now - pulse.start;
-      if (age >= CONFIG.burst.pulseMs) { pulse = null; return; }
-      if (still) return;
-      var f = 1 - age / CONFIG.burst.pulseMs;
-      ctx.strokeStyle = palette.colors[pulse.color];
-      ctx.lineWidth = 1.2;
-      ctx.globalAlpha = f * 0.72;
-      ctx.beginPath(); ctx.arc(pulse.x, pulse.y, 8 + age * 0.25, 0, TAU); ctx.stroke();
-      ctx.globalAlpha = f * 0.3;
-      ctx.beginPath(); ctx.arc(pulse.x, pulse.y, 20 + age * 0.31, 0, TAU); ctx.stroke();
+    var LIMIT = C * 1.1; maxLink = 0;
+    for (var kv of edges) {
+      e = kv[1];
+      // A bond can never stretch: the moment its ends are too far apart (a particle wrapped around the screen edge, or they drifted apart) it is
+      // dropped, and as it nears its limit it fades. Only the brightness eases, never the length.
+      var ex = e.a.x - e.b.x, ey = e.a.y - e.b.y, ed = Math.sqrt(ex * ex + ey * ey);
+      if (ed > LIMIT || (e.a.die && e.a.fade < .02) || (e.b.die && e.b.fade < .02)) { edges.delete(kv[0]); continue; }
+      if (still) e.al = e.tg; else e.al += (e.tg - e.al) * (e.tg > e.al ? .07 : .035) * frameK;
+      if (e.tg === 0 && e.al < .012) { edges.delete(kv[0]); continue; }
+      var shown = e.al * (ed > C ? 1 - (ed - C) / (LIMIT - C) : 1); if (shown < .02) continue;
+      if (ed > maxLink) maxLink = ed;
+      BS[e.g * 6 + Math.min(5, Math.floor(shown * 6))].push(e); edgeCount++;
     }
-
-    function render(still) {
-      var now = performance.now(), t = elapsed / 1000;
-      ctx.clearRect(0, 0, width, height);
-      drawAmbient();
-      drawHubs(t);
-      drawDust(t);
-      drawEdges(t, still);
-      drawNodes(t);
-      drawPointerFocus();
-      drawPulse(now, still);
-      ctx.globalAlpha = 1;
-    }
-
-    /* --- loop: runs only while visible, on-screen and motion is allowed --- */
-    function canAnimate() { return !destroyed && onScreen && !document.hidden && !reduced; }
-
-    function frame(now) {
-      rafId = 0;
-      if (!canAnimate()) return;
-      step(now);
-      render(false);
-      rafId = window.requestAnimationFrame(frame);
-    }
-    function schedule() { if (!rafId && canAnimate()) rafId = window.requestAnimationFrame(frame); }
-    function halt() {
-      if (rafId) window.cancelAnimationFrame(rafId);
-      rafId = 0;
-      lastTime = 0;                  // so the first frame after a pause does not see a huge dt
-    }
-
-    /* --- interaction --- */
-    function burstAt(x, y) {
-      burstCount++;
-      pulse = { x: x, y: y, start: performance.now(), color: burstCount % 3 };
-
-      var wanted = CONFIG.burst.min + Math.floor(random() * CONFIG.burst.spread);
-      var overflow = Math.max(0, nodes.length + wanted - CONFIG.nodeCap);
-      for (var i = 0; i < nodes.length && overflow > 0;) {
-        if (nodes[i].spawned) {
-          removeNodeAt(i);
-          overflow--;
-        } else {
-          i++;
-        }
-      }
-
-      for (var n = 0; n < wanted && nodes.length < CONFIG.nodeCap; n++) {
-        var angle = random() * TAU, distance = 8 + random() * 46;
-        var node = createNode({ x: x + Math.cos(angle) * distance, y: y + Math.sin(angle) * distance });
-        node.connects = true;
-        if (reduced) node.burst = false; // Keep interaction visible without starting motion.
-        node.vx = Math.cos(angle) * (0.045 + random() * 0.09);
-        node.kick = Math.sin(angle) * (0.018 + random() * 0.035);
-        node.fall -= 0.006;
-        var nodeIndex = nodes.push(node) - 1;
-        connectBurstNode(nodeIndex);
-      }
-
-      // The click adds a local pulse and a small cluster; ambient nodes are not kicked.
-      if (reduced) render(true); else schedule();
-    }
-
-    // Track the whole hero, not only the canvas pixels exposed behind content.
-    // A single rect read per input event avoids offsetX switching coordinate spaces
-    // when a link or heading is the event target.
-    function pointerCoordinates(event, target) {
-      var rect = target.getBoundingClientRect();
-      return {
-        x: clamp(event.clientX - rect.left, 0, width),
-        y: clamp(event.clientY - rect.top, 0, height)
-      };
-    }
-    function onPointerMove(event) {
-      var point = pointerCoordinates(event, host);
-      pointer.x = pointer.tx = point.x;
-      pointer.y = pointer.ty = point.y;
-      schedule();
-    }
-    function onPointerLeave() {
-      pointer.x = pointer.y = pointer.tx = pointer.ty = CONFIG.pointerOff;
-    }
-    function onClick(event) {
-      var point = pointerCoordinates(event, canvas);
-      burstAt(point.x, point.y);
-    }
-    function onKeyDown(event) {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      burstAt(width * CONFIG.burst.keyboardAt[0], height * CONFIG.burst.keyboardAt[1]);
-    }
-
-    // Input stays live under reduced motion: the field reacts, it just does not animate.
-    host.addEventListener('pointermove', onPointerMove, { passive: true });
-    host.addEventListener('pointerleave', onPointerLeave, { passive: true });
-    canvas.addEventListener('click', onClick);
-    canvas.addEventListener('keydown', onKeyDown);
-
-    /* --- lifecycle --- */
-    var resizeObserver = null, intersectionObserver = null, themeObserver = null;
-
-    function onVisibility() { if (document.hidden) halt(); else schedule(); }
-    function onMotionChange(event) {
-      reduced = event.matches;
-      if (reduced) { halt(); render(true); } else schedule();
-    }
-
-    if ('ResizeObserver' in window) {
-      resizeObserver = new ResizeObserver(resize);
-      resizeObserver.observe(host);
-    } else {
-      window.addEventListener('resize', resize, { passive: true });
-    }
-    if ('IntersectionObserver' in window) {
-      intersectionObserver = new IntersectionObserver(function (entries) {
-        onScreen = !!entries[entries.length - 1].isIntersecting;
-        if (onScreen) schedule(); else halt();
-      }, { threshold: 0.01 });
-      intersectionObserver.observe(host);
-    }
-    themeObserver = new MutationObserver(function () {
-      palette = readPalette();
-      buildSprites();
-      render(true);
-      schedule();
-    });
-    themeObserver.observe(root, { attributes: true, attributeFilter: ['data-theme'] });
-    document.addEventListener('visibilitychange', onVisibility);
-    if (motionQuery) {
-      if (motionQuery.addEventListener) motionQuery.addEventListener('change', onMotionChange);
-      else if (motionQuery.addListener) motionQuery.addListener(onMotionChange);
-    }
-
-    function destroy() {
-      destroyed = true;
-      halt();
-      if (resizeObserver) resizeObserver.disconnect(); else window.removeEventListener('resize', resize);
-      if (intersectionObserver) intersectionObserver.disconnect();
-      themeObserver.disconnect();
-      document.removeEventListener('visibilitychange', onVisibility);
-      if (motionQuery) {
-        if (motionQuery.removeEventListener) motionQuery.removeEventListener('change', onMotionChange);
-        else if (motionQuery.removeListener) motionQuery.removeListener(onMotionChange);
-      }
-      host.removeEventListener('pointermove', onPointerMove);
-      host.removeEventListener('pointerleave', onPointerLeave);
-      canvas.removeEventListener('click', onClick);
-      canvas.removeEventListener('keydown', onKeyDown);
-    }
-
-    resize();
-    return { destroy: destroy, pause: halt, resume: schedule };
+    ctx.clearRect(0, 0, W, H); ctx.lineWidth = .9;
+    for (b = 0; b < 18; b++) { var Ls = BS[b]; if (!Ls.length) continue; ctx.strokeStyle = col(Math.floor(b / 6), ((b % 6) + .5) / 6); ctx.beginPath(); for (var k = 0; k < Ls.length; k++) { ctx.moveTo(Ls[k].a.x, Ls[k].a.y); ctx.lineTo(Ls[k].b.x, Ls[k].b.y); } ctx.stroke(); }
+    for (i = 0; i < n; i++) { p = pts[i]; var r = rv[i], al = hw[i] * ef[i]; if (al < .02) continue; ctx.fillStyle = r > .05 ? col(p.g, Math.min(1, (.35 + r * .75) * al)) : ink((dark ? .36 : .4) * al); ctx.beginPath(); ctx.arc(p.x, p.y, p.r * (1 + r * .9), 0, TAU); ctx.fill(); }
+    // the small cursor glow: a compositor layer (transform + opacity only)
+    var R = Math.round(clamp(W * .19, 105, 190) * .9);
+    if (cursorEl._r !== R) { cursorEl._r = R; cursorEl.style.width = cursorEl.style.height = R * 2 + 'px'; }
+    cursorEl.style.opacity = (still ? 0 : P.a).toFixed(3); cursorEl.style.transform = 'translate3d(' + (P.gx - R).toFixed(1) + 'px,' + (P.gy - R).toFixed(1) + 'px,0)';
   }
 
-  /* -------------------------------------------------------------- 4. bootstrap */
-  var fields = [];
-  Array.prototype.forEach.call(hosts, function (host, index) {
-    var field = createField(host, index);
-    if (field) fields.push(field);
-  });
+  /* ----------------------------------------------------------------- loop */
+  function tick(now) {
+    raf = 0; if (destroyed || paused || document.hidden || reduced) return;
+    var dt = Math.min(now - (last || now), 50) || 16.7; last = now; t += dt; frameK = dt / 16.7; scrollY = window.pageYOffset || 0;
+    geometry(); var t0 = performance.now(); step(dt); render(false); cost += (performance.now() - t0 - cost) * .08; fps += (1000 / dt - fps) * .05;
+    raf = requestAnimationFrame(tick);
+  }
+  function start() { if (booted && !raf && !paused && !reduced && !destroyed) { last = 0; raf = requestAnimationFrame(tick); } }
+  function halt() { if (raf) cancelAnimationFrame(raf); raf = 0; last = 0; }
+  function stillFrame() { if (!booted) return; geometry(); render(true); }
+  function setStatus(label) { Array.prototype.forEach.call(document.querySelectorAll('[data-field-status]'), function (n) { n.textContent = label; }); }
+  function settle() { for (var i = 0; i < 240; i++) { t += 16.7; step(16.7); } edges.clear(); }
 
-  // A page restored from the back/forward cache keeps its fields; a real unload tears them down.
-  window.addEventListener('pagehide', function (event) {
-    fields.forEach(function (field) { if (event.persisted) field.pause(); else field.destroy(); });
-  });
-  window.addEventListener('pageshow', function (event) {
-    if (event.persisted) fields.forEach(function (field) { field.resume(); });
-  });
+  /* ---------------------------------------------------------------- input */
+  window.addEventListener('pointermove', function (e) { if (reduced) return; P.x = e.clientX; P.y = e.clientY; P.touch = e.pointerType === 'touch'; P.active = true; }, { passive: true });
+  window.addEventListener('pointerdown', function (e) {
+    if (reduced || !booted) return; P.x = e.clientX; P.y = e.clientY; P.touch = e.pointerType === 'touch'; if (P.touch) { P.gx = P.x; P.gy = P.y; } P.active = true;
+    var inHero = hero && e.clientY < heroBottom && e.clientY > heroTop;
+    if (inHero && !(e.target.closest && e.target.closest(INTERACTIVE)) && !(window.getSelection && String(window.getSelection()))) tap(e.clientX, e.clientY);   // taps only in the hero: never while reading
+  }, { passive: true });
+  window.addEventListener('pointerup', function (e) { if (e.pointerType === 'touch') P.active = false; }, { passive: true });
+  window.addEventListener('pointercancel', function () { P.active = false; }, { passive: true });
+  document.documentElement.addEventListener('mouseleave', function () { P.active = false; });
+  window.addEventListener('scroll', function () { scrollY = window.pageYOffset || 0; }, { passive: true });
+  var resizeTimer = 0; window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(function () { if (!booted) return; size(); geometry(); if (reduced) stillFrame(); }, 120); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) halt(); else start(); });
+  function groupOf(target) { var el = target && target.closest ? target.closest('[data-field-focus]') : null; return el ? Number(el.getAttribute('data-field-focus')) : -1; }
+  document.addEventListener('pointerover', function (e) { var g = groupOf(e.target); if (g !== hoverGroup) { hoverGroup = g; if (g >= 0) flashes.push({ x: hubs[g].x, y: hubs[g].y, a: .8 }); } }, { passive: true });
+  document.addEventListener('focusin', function (e) { var g = groupOf(e.target); if (g >= 0) hoverGroup = g; });
+  document.addEventListener('focusout', function (e) { if (groupOf(e.target) >= 0) hoverGroup = -1; });
+  new MutationObserver(function () { palette(); if (reduced) stillFrame(); }).observe(root, { attributes: true, attributeFilter: ['data-theme'] });   // palette only: nothing restarts
+  if (motionQuery) { var onMotion = function (e) { reduced = e.matches; setStatus(reduced ? 'STILL FIELD' : 'LIVE FIELD'); if (reduced) { halt(); settle(); stillFrame(); } else start(); }; if (motionQuery.addEventListener) motionQuery.addEventListener('change', onMotion); else if (motionQuery.addListener) motionQuery.addListener(onMotion); }
+  window.addEventListener('pagehide', function (e) { if (e.persisted) halt(); else { destroyed = true; halt(); } });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) { scrollY = lastScroll = window.pageYOffset || 0; start(); } });
+
+  /* ------------------------------------------------------------ boot + API */
+  function boot() {
+    if (booted || destroyed) return; booted = true; scrollY = lastScroll = window.pageYOffset || 0;
+    palette(); size(); geometry(); settle(); setStatus(reduced ? 'STILL FIELD' : 'LIVE FIELD');      // warmed up once, so the first frame is already mid-flight
+    if (reduced) stillFrame(); else { render(false); start(); }
+    requestAnimationFrame(function () { canvas.classList.add('is-live'); });
+  }
+  function scheduleBoot() { if (window.requestIdleCallback) window.requestIdleCallback(boot, { timeout: 1500 }); else setTimeout(boot, 150); }
+  setStatus(reduced ? 'STILL FIELD' : 'LIVE FIELD');
+  if (document.readyState === 'complete') scheduleBoot(); else window.addEventListener('load', scheduleBoot);
+
+  window.FieldParticles = {
+    setVolume: function (id) { volumeFocus = id >= 1 && id <= 3 ? id - 1 : -1; },
+    pulse: function (g) { if (g >= 0 && g < 3) flashes.push({ x: hubs[g].x, y: hubs[g].y, a: 1 }); },
+    pause: function () { paused = true; halt(); }, resume: function () { paused = false; start(); },
+    stats: function () { var h = !!hero && heroBottom > 0 && heroTop < window.innerHeight; return { tier: 'full', particles: pts.length, links: edgeCount, maxLink: Math.round(maxLink), heroVisible: h, reduced: reduced, canvas: [canvas.width, canvas.height], costMs: +cost.toFixed(2), frameMs: +(1000 / Math.max(fps, 1)).toFixed(1), bursts: taps, focus: volumeFocus, hover: hoverGroup }; }
+  };
 })();

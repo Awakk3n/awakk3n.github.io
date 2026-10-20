@@ -22,6 +22,7 @@
   function renderHeader(book) {
     var words = book.chapters.reduce(function (sum, chapter) { return sum + chapter.words; }, 0);
     document.title = book.title + ' — The Product Field';
+    if (window.FieldParticles) window.FieldParticles.setVolume(book.id);   // bring this volume's constellation forward
     F.$('#book-companions').hidden = book.id !== 3;
     F.$('#book-kicker').textContent = 'VOLUME / ' + pad2(book.id);
     F.$('#book-title').textContent = book.title;

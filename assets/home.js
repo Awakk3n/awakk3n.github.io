@@ -33,7 +33,9 @@
     if (rail) rail.textContent = 'PM / 001—' + String(total).padStart(3, '0');
     F.$$('[data-book-count]').forEach(function (node) {
       var book = books.filter(function (b) { return String(b.id) === node.getAttribute('data-book-count'); })[0];
-      if (book) node.textContent = pad2(book.chapters.length) + ' CH';
+      if (!book) return;
+      var read = book.chapters.filter(function (c) { return F.isRead(c.id); }).length;
+      node.textContent = pad2(book.chapters.length) + ' CH' + (read ? ' · ' + read + ' READ' : '');
     });
   }
 

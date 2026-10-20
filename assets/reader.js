@@ -8,8 +8,10 @@
   var LAST_READ_KEY = 'field-last-read';
   var PROGRESS_WRITE_STEP = 0.01;     // persist reading progress per whole percent, not per scroll event
   var NOTES_SAVE_DELAY_MS = 350;
+  var RESUME_MIN = 0.03;               // don't offer "resume" for a few lines of scroll
   var SEARCH_SCROLL_DELAY_MS = 180;
-  var TEXT_SIZE = { min: 15, max: 24, fallback: 19 };
+  var TEXT_SIZE = { min: 15, max: 24, fallback: 19, key: 'field-reader-font' };
+  var READING_WPM = 230;               // average adult silent-reading speed for non-fiction
 
   var query = new URLSearchParams(location.search);
   var id = query.get('chapter');
@@ -50,7 +52,7 @@
     if (done !== shownDone) {
       shownDone = done;
       doneButton.classList.toggle('done', done);
-      doneButton.innerHTML = done ? '<span aria-hidden="true">✓</span> Read' : '<span aria-hidden="true">○</span> Mark as read';
+      doneButton.innerHTML = done ? '<span aria-hidden="true">✓</span> Marked as read' : '<span aria-hidden="true">○</span> Mark as read';
     }
   }
 
@@ -58,6 +60,20 @@
     if (progressQueued) return;
     progressQueued = true;
     window.requestAnimationFrame(updateProgress);
+  }
+
+  /* A long chapter is rarely read in one sitting: offer a one-tap return to the furthest point reached. */
+  function offerResume() {
+    var button = F.$('#resume-reading');
+    if (!button || !chapter) return;
+    var saved = F.rememberProgress(chapter.id, null);
+    if (saved < RESUME_MIN || saved >= F.READ_THRESHOLD || window.scrollY > 120 || query.get('fromSearch') === '1') { button.hidden = true; return; }
+    F.$('#resume-percent').textContent = Math.round(saved * 100) + '%';
+    button.hidden = false;
+    button.onclick = function () {
+      button.hidden = true;
+      window.scrollTo({ top: saved * Math.max(1, document.documentElement.scrollHeight - window.innerHeight), behavior: F.scrollBehavior() });
+    };
   }
 
   function makeOutline() {
@@ -68,11 +84,15 @@
       return;
     }
     var linkById = Object.create(null);
+    var group = -1;
     headings.forEach(function (heading, index) {
       if (!heading.id) heading.id = 'section-' + slug(heading.textContent) + '-' + index;
+      if (heading.tagName.toLowerCase() === 'h2') group = index;       // h3s belong to the h2 before them
       var link = document.createElement('a');
       link.href = '#' + heading.id;
       link.textContent = heading.textContent;
+      link.title = heading.textContent;                                // single-line items: full title on hover
+      link.setAttribute('data-group', String(Math.max(group, 0)));
       link.className = heading.tagName.toLowerCase() === 'h3' ? 'level-3' : '';
       linkById[heading.id] = link;
       outline.appendChild(link);
@@ -108,8 +128,12 @@
       var changed = activeId !== heading.id;
       activeId = heading.id;
       if (changed) {
+        var activeLink = linkById[activeId];
+        var openGroup = activeLink ? activeLink.getAttribute('data-group') : null;
         F.$$('#chapter-outline a').forEach(function (link) {
           var active = link.hash === '#' + activeId;
+          // Wide layout: sub-headings are shown only for the current section (CSS ignores this on phones/tablets).
+          link.classList.toggle('is-collapsed', link.classList.contains('level-3') && link.getAttribute('data-group') !== openGroup);
           link.classList.toggle('current', active);
           if (active) link.setAttribute('aria-current', 'location');
           else link.removeAttribute('aria-current');
@@ -163,9 +187,43 @@
     });
   }
 
+  /* Accessibility repairs that never change the visual design:
+     - heading levels that jump (h2 → h4) get a corrected aria-level;
+     - horizontally scrollable code/tables become keyboard-focusable;
+     - empty table header cells get a screen-reader label. */
+  function prepareContentStructure() {
+    var last = 1;                                  // the page's single <h1> is the hero title
+    F.$$('h1, h2, h3, h4, h5, h6', content).forEach(function (heading) {
+      var level = Number(heading.tagName.charAt(1));
+      if (level === 1) { heading.setAttribute('aria-level', '2'); level = 2; }
+      if (level > last + 1) { heading.setAttribute('aria-level', String(last + 1)); level = last + 1; }
+      last = level;
+    });
+    F.$$('th', content).forEach(function (cell) {
+      if (cell.textContent.trim()) return;
+      var label = document.createElement('span');
+      label.className = 'sr-only';
+      label.textContent = 'Row label';
+      cell.appendChild(label);
+    });
+    markScrollRegions();
+  }
+
+  function markScrollRegions() {
+    var regions = F.$$('pre, table', content);
+    var flags = regions.map(function (region) { return region.scrollWidth > region.clientWidth + 1; });   // read all, then write all
+    regions.forEach(function (region, i) {
+      // tabindex only: adding role="region" would create dozens of identically-named landmarks.
+      if (flags[i]) region.setAttribute('tabindex', '0'); else region.removeAttribute('tabindex');
+    });
+  }
+  window.addEventListener('resize', F.debounce(function () { if (chapter) markScrollRegions(); }, 250), { passive: true });
+
   function finishRender(html) {
     content.innerHTML = html;
     prepareContentLinks();
+    prepareContentStructure();
+    offerResume();
     makeOutline();
     updateProgress();
     applySearchContext();
@@ -249,199 +307,22 @@
     document.head.appendChild(script);
   }
 
-  function loadYouTubeAPI() {
-    if (window.YT && typeof window.YT.Player === 'function') return Promise.resolve(window.YT);
-    if (window.FIELD_YOUTUBE_API_PROMISE) return window.FIELD_YOUTUBE_API_PROMISE;
-
-    window.FIELD_YOUTUBE_API_PROMISE = new Promise(function (resolve, reject) {
-      var settled = false;
-      var timer = window.setTimeout(function () {
-        if (!settled) { settled = true; reject(new Error('YouTube player API timed out')); }
-      }, 12000);
-      var previousReady = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = function () {
-        if (typeof previousReady === 'function') {
-          try { previousReady(); } catch (e) {}
-        }
-        if (settled) return;
-        settled = true;
-        window.clearTimeout(timer);
-        if (window.YT && typeof window.YT.Player === 'function') resolve(window.YT);
-        else reject(new Error('YouTube player API did not initialize'));
-      };
-      var script = document.createElement('script');
-      script.src = 'https://www.youtube.com/iframe_api';
-      script.async = true;
-      script.onerror = function () {
-        if (!settled) {
-          settled = true;
-          window.clearTimeout(timer);
-          reject(new Error('YouTube player API could not be loaded'));
-        }
-      };
-      document.head.appendChild(script);
-    });
-    return window.FIELD_YOUTUBE_API_PROMISE;
-  }
-
-  function showAudioFallback(stage, videoId, message) {
-    stage.classList.remove('is-playing');
-    stage.classList.add('is-error');
-    stage.replaceChildren();
-    var fallback = document.createElement('div');
-    fallback.className = 'audio-fallback';
-    var note = document.createElement('p');
-    note.textContent = message;
-    var link = document.createElement('a');
-    link.href = 'https://www.youtube.com/watch?v=' + videoId;
-    link.textContent = 'Open this audio on YouTube';
-    link.setAttribute('aria-label', 'Open this chapter audio on YouTube in this tab');
-    fallback.appendChild(note);
-    fallback.appendChild(link);
-    stage.appendChild(fallback);
-  }
-
+  /* Chapter audio lives in assets/audio.js (YouTube, policy-compliant). This only decides whether the
+     chapter has audio and which chapter comes next. */
   function makeAudio() {
     var panel = F.$('#audio-panel');
     if (!panel || !chapter) return;
     var url = audio[chapter.id];
-    panel.innerHTML = '';
     panel.hidden = true;
-    panel.classList.remove('audio-panel-expanded');
-    if (!url) return; // Keep the reading surface uncluttered until audio exists.
-
-    var safeUrl;
-    var videoId = '';
-    try {
-      safeUrl = new URL(url, location.href);
-      var host = safeUrl.hostname.toLowerCase();
-      var youtubeHost = host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be' || host.endsWith('.youtu.be');
-      if (!/^https?:$/.test(safeUrl.protocol) || !youtubeHost) throw Error('Not a YouTube URL');
-      videoId = F.thumbId(safeUrl.href);
-      if (!/^[A-Za-z0-9_-]{11}$/.test(videoId)) throw Error('Could not read a valid YouTube video ID');
-    } catch (e) {
-      panel.hidden = false;
-      panel.className = 'audio-panel audio-panel-error';
-      panel.textContent = 'This chapter’s audio link is invalid. Check the entry in assets/audio-links.js.';
-      return;
-    }
-
-    panel.className = 'audio-panel';
-    panel.hidden = false;
-    var stage = document.createElement('div');
-    stage.className = 'audio-stage';
-    stage.setAttribute('data-video-id', videoId);
-    var poster = document.createElement('button');
-    poster.type = 'button';
-    poster.className = 'audio-poster';
-    poster.setAttribute('aria-label', 'Play audio for ' + chapter.title + ' on this page');
-    var image = document.createElement('img');
-    image.className = 'audio-thumb';
-    image.src = 'https://img.youtube.com/vi/' + videoId + '/hqdefault.jpg';
-    image.alt = '';
-    image.loading = 'lazy';
-    image.onerror = function () { image.remove(); };
-    var shade = document.createElement('span');
-    shade.className = 'audio-poster-shade';
-    shade.setAttribute('aria-hidden', 'true');
-    var play = document.createElement('span');
-    play.className = 'audio-play-control';
-    play.innerHTML = '<span aria-hidden="true">▶</span><b>PLAY AUDIO</b>';
-    poster.appendChild(image);
-    poster.appendChild(shade);
-    poster.appendChild(play);
-
-    // Preload the official API on a real web origin, so the player's creation
-    // is likely to happen inside the listening click. Never load it from file://.
-    var playerApiPromise = null;
-    if (location.protocol === 'http:' || location.protocol === 'https:') {
-      playerApiPromise = loadYouTubeAPI();
-      playerApiPromise.catch(function () {});
-    }
-
-    poster.addEventListener('click', function () {
-      panel.classList.add('audio-panel-expanded');
-
-      // YouTube requires a website referrer for embedded playback. A file://
-      // preview cannot send one, so replace the raw Error 153 screen with a
-      // useful explanation and a same-tab fallback link.
-      if (location.protocol === 'file:' || location.origin === 'null') {
-        showAudioFallback(stage, videoId, 'You are viewing a local copy. YouTube blocks in-page playback when this local page cannot send the required website referrer (Error 153). Publish the site to GitHub Pages and open its HTTPS address to listen here.');
-        return;
-      }
-
-      stage.classList.remove('is-error');
-      stage.classList.add('is-playing');
-      stage.replaceChildren();
-      var mount = document.createElement('div');
-      mount.className = 'audio-player-mount';
-      mount.id = 'field-audio-player-' + chapter.id.replace(/[^a-zA-Z0-9_-]/g, '-');
-      stage.appendChild(mount);
-
-      var createPlayer = function (YT) {
-        if (!stage.isConnected) return;
-        try {
-          new YT.Player(mount.id, {
-            width: '100%',
-            height: '100%',
-            videoId: videoId,
-            playerVars: {
-              autoplay: 1,
-              playsinline: 1,
-              rel: 0,
-              controls: 1,
-              enablejsapi: 1,
-              origin: location.origin,
-              widget_referrer: location.href
-            },
-            events: {
-              onReady: function (event) {
-                var frame = event.target && event.target.getIframe ? event.target.getIframe() : null;
-                if (frame) {
-                  frame.classList.add('audio-iframe');
-                  frame.title = 'YouTube audio for ' + chapter.title;
-                  frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-                  frame.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; web-share');
-                }
-                try { event.target.playVideo(); } catch (e) {}
-              },
-              onError: function (event) {
-                var message = 'YouTube could not play this audio here. You can still open the source on YouTube.';
-                if (event.data === 153) message = 'YouTube refused the embedded player because it did not receive a website referrer (Error 153). Open the published HTTPS site, and make sure its referrer policy is not set to no-referrer.';
-                else if (event.data === 101 || event.data === 150) message = 'This video does not allow embedded playback. Choose a YouTube upload with embedding enabled, or open this one on YouTube.';
-                else if (event.data === 100) message = 'This YouTube video is private, unavailable, or has been removed.';
-                else if (event.data === 2) message = 'The YouTube URL has an invalid video ID. Check assets/audio-links.js.';
-                showAudioFallback(stage, videoId, message);
-              }
-            }
-          });
-        } catch (error) {
-          showAudioFallback(stage, videoId, 'The YouTube player could not be initialized. Check your connection and try again.');
-        }
-      };
-
-      (playerApiPromise || loadYouTubeAPI()).then(createPlayer).catch(function () {
-        showAudioFallback(stage, videoId, 'The YouTube player could not load. Check your connection, then try again or open the source on YouTube.');
-      });
-    }, { once: true });
-    stage.appendChild(poster);
-
-    var heading = document.createElement('div');
-    heading.className = 'audio-heading';
-    var label = document.createElement('span');
-    label.className = 'audio-overline';
-    label.textContent = 'LISTEN ALONG';
-    var title = document.createElement('h2');
-    title.className = 'audio-title';
-    title.textContent = 'Chapter audio';
-    var note = document.createElement('p');
-    note.className = 'audio-note';
-    note.textContent = 'Listen here through YouTube. The audio is streamed by YouTube, not stored on this site.';
-    heading.appendChild(label);
-    heading.appendChild(title);
-    heading.appendChild(note);
-    panel.appendChild(heading);
-    panel.appendChild(stage);
+    if (!url || !window.FieldAudio) return;       // keep the reading surface uncluttered until audio exists
+    var index = book.chapters.findIndex(function (item) { return item.id === chapter.id; });
+    var next = index >= 0 ? book.chapters[index + 1] : null;
+    window.FieldAudio.mount(panel, {
+      chapterId: chapter.id,
+      title: chapter.title,
+      url: url,
+      next: next ? { label: next.label, title: next.title, url: next.readUrl } : null
+    });
   }
 
   function jumpLinks() {
@@ -492,6 +373,7 @@
       return;
     }
     book = books.find(function (item) { return item.id === chapter.bookId; });
+    if (window.FieldParticles) window.FieldParticles.setVolume(book.id);   // bring this volume's constellation forward
     document.title = chapter.title + ' — The Product Field';
     F.writeJSON(LAST_READ_KEY, { id: chapter.id, title: chapter.title, book: book.title, url: chapter.readUrl, label: chapter.label, openedAt: Date.now() });
     F.$('#reader-title').textContent = chapter.title;
@@ -499,7 +381,7 @@
     F.$('#reader-num').textContent = 'CHAPTER ' + chapter.label;
     F.$('#reader-hero-num').textContent = 'CHAPTER ' + chapter.label;
     F.$('#reader-volume-label').textContent = 'VOLUME / ' + String(book.id).padStart(2, '0');
-    F.$('#reader-byline').textContent = book.title + ' · ' + Number(chapter.words || 0).toLocaleString() + ' words';
+    F.$('#reader-byline').textContent = book.title + ' · ' + Number(chapter.words || 0).toLocaleString() + ' words · ' + Math.max(1, Math.round((chapter.words || 0) / READING_WPM)) + ' min read';
     F.$('#crumb-book').textContent = book.title;
     F.$('#crumb-book').href = 'book.html?b=' + book.id;
     F.$('#crumb-chapter').textContent = chapter.title;
@@ -521,7 +403,7 @@
     if (!button || !chapter) return;
     var saved = !!getBookmarks()[chapter.id];
     button.setAttribute('aria-pressed', saved ? 'true' : 'false');
-    button.innerHTML = saved ? '★ <span>Saved</span>' : '☆ <span>Save</span>';
+    var icon = button.querySelector('.bm-icon'); if (icon) icon.textContent = saved ? '★' : '☆';
     button.classList.toggle('is-saved', saved);
   }
   var bookmarkButton = F.$('#bookmark-chapter');
@@ -620,14 +502,29 @@
     var completed = F.isRead(chapter.id);
     F.rememberProgress(chapter.id, completed ? 0 : 1);
     updateProgress();
-    if (!completed) window.scrollTo({ top: 0, behavior: F.scrollBehavior() });
+    showReaderToast(completed ? 'Marked as unread' : 'Marked as read');      // feedback in place: the page stays exactly where it is
   });
 
-  function changeTextSize(delta) {
-    var style = document.documentElement.style;
-    var current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-font')) || TEXT_SIZE.fallback;
-    style.setProperty('--reader-font', Math.max(TEXT_SIZE.min, Math.min(TEXT_SIZE.max, current + delta)) + 'px');
+  function syncTextSizeButtons() {            // A− / A+ are disabled at the smallest and largest size
+    var size = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-font')) || TEXT_SIZE.fallback;
+    F.$('#text-smaller').disabled = size <= TEXT_SIZE.min; F.$('#text-larger').disabled = size >= TEXT_SIZE.max;
   }
+  function setTextSize(px) {
+    document.documentElement.style.setProperty('--reader-font', Math.max(TEXT_SIZE.min, Math.min(TEXT_SIZE.max, px)) + 'px');
+    if (F.$('#text-smaller')) syncTextSizeButtons();
+  }
+  function changeTextSize(delta) {
+    var current = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--reader-font')) || TEXT_SIZE.fallback;
+    var next = Math.max(TEXT_SIZE.min, Math.min(TEXT_SIZE.max, current + delta));
+    setTextSize(next);
+    try { localStorage.setItem(TEXT_SIZE.key, String(next)); } catch (error) { /* non-fatal */ }
+    syncTextSizeButtons();
+  }
+  try {                                           // restore the reader's choice before the chapter renders
+    var savedSize = Number(localStorage.getItem(TEXT_SIZE.key));
+    if (savedSize) setTextSize(savedSize);
+  } catch (error) { /* storage blocked */ }
+  syncTextSizeButtons();
   F.$('#text-smaller').addEventListener('click', function () { changeTextSize(-1); });
   F.$('#text-larger').addEventListener('click', function () { changeTextSize(1); });
 })();

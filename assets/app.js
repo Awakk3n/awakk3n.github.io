@@ -224,6 +224,7 @@
     writeJSON: writeJSON,
     rememberProgress: rememberProgress,
     isRead: isRead,
+    READ_THRESHOLD: READ_THRESHOLD,
     applySearchContext: applySearchContext,
 
     // The bundled catalogue works on GitHub Pages and from file://; books.json is the fallback.

@@ -4,7 +4,7 @@
   if (!F) return;
   var $ = F.$;
   var PRACTICE_LOG_KEY = 'field-practice-log';
-  var DATA_KEYS = ['field-progress', 'field-bookmarks', 'field-notes', PRACTICE_LOG_KEY];
+  var DATA_KEYS = ['field-progress', 'field-bookmarks', 'field-notes', 'field-audio-pos', PRACTICE_LOG_KEY];
   var MAX_ATTEMPTS = 500;
   var MAX_NOTE_LENGTH = 50000;
   var DEFAULT_MINUTES = 10;
@@ -191,6 +191,13 @@
             Object.keys(incoming).forEach(function (id) {
               var chapter = validChapterIds[id]; if (!chapter) return;
               merged[id] = { title: chapter.title, url: chapter.readUrl, book: chapter.bookTitle || (books.filter(function (b) { return b.id === chapter.bookId; })[0] || {}).title || 'Product Field' };
+            });
+          } else if (key === 'field-audio-pos') {
+            merged = Object.assign({}, current);
+            Object.keys(incoming).forEach(function (id) {
+              var entry = incoming[id], t = entry && Number(entry.t), at = entry && Number(entry.at) || 0;
+              if (!validChapterIds[id] || !(t >= 0 && t <= 86400)) return;
+              if (!merged[id] || (Number(merged[id].at) || 0) < at) merged[id] = { t: Math.floor(t), at: at };   // keep the most recent
             });
           } else if (key === 'field-notes') {
             merged = Object.assign({}, current);
