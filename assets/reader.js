@@ -34,10 +34,11 @@
   var shownPercent = -1;
   var shownDone = null;
   var progressQueued = false;
+  var fullBookLoading = false;
 
   function updateProgress() {
     progressQueued = false;
-    if (!chapter) return;
+    if (!chapter || fullBookLoading) return;
     var scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     var current = Math.min(1, Math.max(0, window.scrollY / scrollable));
     var saved = F.rememberProgress(chapter.id, null);
@@ -85,23 +86,35 @@
       outline.innerHTML = '<span class="outline-placeholder">No section headings in this chapter.</span>';
       return;
     }
+
     var linkById = Object.create(null);
+    var linksByGroup = Object.create(null);
     var group = -1;
+    var fragment = document.createDocumentFragment();
     headings.forEach(function (heading, index) {
       if (!heading.id) heading.id = 'section-' + slug(heading.textContent) + '-' + index;
-      if (heading.tagName.toLowerCase() === 'h2') group = index;       // h3s belong to the h2 before them
+      if (heading.tagName.toLowerCase() === 'h2') group = index; // h3s belong to the h2 before them
+      var groupId = String(Math.max(group, 0));
       var link = document.createElement('a');
       link.href = '#' + heading.id;
       link.textContent = heading.textContent;
-      link.title = heading.textContent;                                // single-line items: full title on hover
-      link.setAttribute('data-group', String(Math.max(group, 0)));
-      link.className = heading.tagName.toLowerCase() === 'h3' ? 'level-3' : '';
+      link.title = heading.textContent;
+      link.setAttribute('data-group', groupId);
+      link.className = heading.tagName.toLowerCase() === 'h3' ? 'level-3 is-collapsed' : '';
       linkById[heading.id] = link;
-      outline.appendChild(link);
+      if (link.classList.contains('level-3')) {
+        if (!linksByGroup[groupId]) linksByGroup[groupId] = [];
+        linksByGroup[groupId].push(link);
+      }
+      fragment.appendChild(link);
     });
+    // One DOM insertion is substantially cheaper than appending thousands of outline links individually.
+    outline.appendChild(fragment);
 
     var activeId = '';
-    function keepActiveLinkVisible(link, preferSmooth) {
+    var activeLink = null;
+    var activeGroup = null;
+    function keepActiveLinkVisible(link) {
       if (!link || !outline) return;
       var navRect = outline.getBoundingClientRect();
       var linkRect = link.getBoundingClientRect();
@@ -118,45 +131,53 @@
       target = Math.max(0, Math.min(max, target));
       var current = horizontal ? outline.scrollLeft : outline.scrollTop;
       if (Math.abs(target - current) < 2) return;
-      // Keep TOC auto-follow immediate: repeated smooth scroll requests can lag while the reader moves quickly.
       var options = { behavior: 'auto' };
       if (horizontal) options.left = target; else options.top = target;
-      // Scroll only the outline's own strip/sidebar, never the chapter body or page.
       outline.scrollTo(options);
     }
 
     function setActive(heading) {
       if (!heading) return;
+      var nextLink = linkById[heading.id];
+      if (!nextLink) return;
       var changed = activeId !== heading.id;
-      activeId = heading.id;
-      if (changed) {
-        var activeLink = linkById[activeId];
-        var openGroup = activeLink ? activeLink.getAttribute('data-group') : null;
-        F.$$('#chapter-outline a').forEach(function (link) {
-          var active = link.hash === '#' + activeId;
-          // Wide layout: sub-headings are shown only for the current section (CSS ignores this on phones/tablets).
-          link.classList.toggle('is-collapsed', link.classList.contains('level-3') && link.getAttribute('data-group') !== openGroup);
-          link.classList.toggle('current', active);
-          if (active) link.setAttribute('aria-current', 'location');
-          else link.removeAttribute('aria-current');
-        });
+      var nextGroup = nextLink.getAttribute('data-group');
+      if (activeGroup !== nextGroup) {
+        (linksByGroup[activeGroup] || []).forEach(function (link) { link.classList.add('is-collapsed'); });
+        (linksByGroup[nextGroup] || []).forEach(function (link) { link.classList.remove('is-collapsed'); });
+        activeGroup = nextGroup;
       }
-      // Recheck visibility even when the active section did not change (e.g. after rotation).
-      // Scroll only the outline strip/sidebar, never the reading page itself.
-      keepActiveLinkVisible(linkById[activeId], changed);
+      if (activeLink !== nextLink) {
+        if (activeLink) {
+          activeLink.classList.remove('current');
+          activeLink.removeAttribute('aria-current');
+        }
+        activeLink = nextLink;
+        activeLink.classList.add('current');
+        activeLink.setAttribute('aria-current', 'location');
+      }
+      activeId = heading.id;
+      // Binary search the ordered heading list on scroll; avoid a linear scan and thousands of
+      // getBoundingClientRect() calls on every frame in the complete books.
+      keepActiveLinkVisible(activeLink);
     }
+
     var ticking = false;
     function updateActiveFromScroll() {
       ticking = false;
       if (!headings.length) return;
       var threshold = Math.min(window.innerHeight * .3, 260);
-      var active = headings[0];
-      for (var i = 0; i < headings.length; i++) {
-        var top = headings[i].getBoundingClientRect().top;
-        if (top <= threshold) active = headings[i];
-        else break;
+      var low = 0, high = headings.length - 1, best = 0;
+      while (low <= high) {
+        var mid = (low + high) >> 1;
+        if (headings[mid].getBoundingClientRect().top <= threshold) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
       }
-      setActive(active);
+      setActive(headings[best]);
     }
     function onScroll() {
       if (ticking) return;
@@ -287,7 +308,308 @@
     });
   }
 
+  function loadChunkedFullBook() {
+    var parts = Array.isArray(chapter.contentParts) ? chapter.contentParts : [];
+    if (!parts.length) { loadFullBookMarkdown(); return; }
+
+    fullBookLoading = true;
+    content.innerHTML = '<p>Loading the complete book…</p>';
+    outline.innerHTML = '<span class="outline-placeholder">Preparing the book outline…</span>';
+
+    function revealLoadError(message) {
+      var error = F.$('#content-error');
+      error.hidden = false;
+      error.innerHTML = message + ' <a href="' + F.esc(chapter.file) + '" target="_blank" rel="noopener">Open the Markdown source</a>.';
+    }
+
+    function loadScript(path, onload, onerror) {
+      var script = document.createElement('script');
+      script.src = path;
+      script.async = true;
+      script.onload = function () { script.remove(); onload(); };
+      script.onerror = function () { script.remove(); onerror(); };
+      document.head.appendChild(script);
+    }
+
+    function finalize() {
+      fullBookLoading = false;
+      prepareContentLinks();
+      prepareContentStructure();
+      offerResume();
+      makeOutline();
+      updateProgress();
+      applySearchContext();
+      tryPendingFullBookHash();
+      if (location.hash.length > 1 && !pendingFullBookHash) {
+        var idFromUrl;
+        try { idFromUrl = decodeURIComponent(location.hash.slice(1)); }
+        catch (error) { idFromUrl = location.hash.slice(1); }
+        var targetFromUrl = document.getElementById(idFromUrl);
+        if (targetFromUrl) targetFromUrl.scrollIntoView({ behavior: 'auto', block: 'start' });
+      }
+    }
+
+    loadScript(chapter.contentFile || parts[0], function () {
+      var html = window.FIELD_CHAPTER_HTML && window.FIELD_CHAPTER_HTML[chapter.id];
+      if (typeof html !== 'string') {
+        fullBookLoading = false;
+        loadFullBookMarkdown();
+        return;
+      }
+      content.innerHTML = html;
+      if (window.FIELD_CHAPTER_HTML) delete window.FIELD_CHAPTER_HTML[chapter.id];
+      if (parts.length === 1) { finalize(); return; }
+
+      // Keep a small number of requests in flight. Chunks are appended in source order, even if
+      // a later network request finishes first, and each append yields back to the browser.
+      var nextRequest = 1;
+      var nextAppend = 1;
+      var activeRequests = 0;
+      var pending = Object.create(null);
+      var hadChunkError = false;
+      var maxConcurrent = 8;
+      var appendScheduled = false;
+      var appendInProgress = false;
+
+      function flushReadyChunks() {
+        if (appendScheduled || appendInProgress) return;
+        if (nextAppend >= parts.length) {
+          if (hadChunkError) revealLoadError('One or more book sections could not be loaded. Reload the page to retry.');
+          finalize();
+          return;
+        }
+        if (!Object.prototype.hasOwnProperty.call(pending, nextAppend)) {
+          requestMoreChunks();
+          return;
+        }
+
+        // Insert at most ~96 KB of pre-rendered HTML per frame. The browser can paint and
+        // respond to input between batches, while combining ready parts cuts down total load time.
+        appendScheduled = true;
+        window.requestAnimationFrame(function () {
+          appendScheduled = false;
+          appendInProgress = true;
+          var htmlBatch = [];
+          var batchChars = 0;
+          var maxAppendChars = 96000;
+          while (Object.prototype.hasOwnProperty.call(pending, nextAppend)) {
+            var chunkHtml = pending[nextAppend];
+            if (htmlBatch.length && batchChars + (chunkHtml ? chunkHtml.length : 0) > maxAppendChars) break;
+            delete pending[nextAppend];
+            if (typeof chunkHtml === 'string' && chunkHtml) {
+              htmlBatch.push(chunkHtml);
+              batchChars += chunkHtml.length;
+            }
+            nextAppend++;
+            if (batchChars >= maxAppendChars) break;
+          }
+          if (htmlBatch.length) content.insertAdjacentHTML('beforeend', htmlBatch.join('\n'));
+          tryPendingFullBookHash();
+          appendInProgress = false;
+
+          if (nextAppend >= parts.length) {
+            if (hadChunkError) revealLoadError('One or more book sections could not be loaded. Reload the page to retry.');
+            finalize();
+            return;
+          }
+          requestMoreChunks();
+          flushReadyChunks();
+        });
+      }
+
+      function requestMoreChunks() {
+        while (activeRequests < maxConcurrent && nextRequest < parts.length) {
+          (function (index, path) {
+            activeRequests++;
+            loadScript(path, function () {
+              var byBook = window.FIELD_CHAPTER_PARTS && window.FIELD_CHAPTER_PARTS[chapter.id];
+              var chunkHtml = byBook && byBook[index];
+              if (byBook) delete byBook[index];
+              pending[index] = typeof chunkHtml === 'string' ? chunkHtml : '';
+              activeRequests--;
+              flushReadyChunks();
+            }, function () {
+              hadChunkError = true;
+              pending[index] = '';
+              activeRequests--;
+              flushReadyChunks();
+            });
+          })(nextRequest, parts[nextRequest]);
+          nextRequest++;
+        }
+      }
+      requestMoreChunks();
+    }, function () {
+      fullBookLoading = false;
+      loadFullBookMarkdown();
+    });
+  }
+
+  /*
+   * Complete books are much larger than normal chapters. Their generated HTML cache can exceed
+   * six megabytes, so hosted readers fetch the source Markdown and render it in short batches.
+   * This shows the opening section quickly, lets the browser paint between batches, and avoids
+   * parsing one enormous JavaScript string. Single-chapter pages keep their existing cache path.
+   */
+  function prepareFullBookChunks(raw) {
+    var lines = normalizeMarkdown(raw).split(/\r?\n/);
+    var chunks = [];
+    var current = [];
+    var currentLength = 0;
+    var anchorMap = Object.create(null);
+    var seenAnchorIds = Object.create(null);
+    var nextAnchor = 0;
+    var insideFence = false;
+    var fenceChar = '';
+    var fenceLength = 0;
+    var skippedBookTitle = false;
+    var maxChunkLength = 42000;
+
+    function pushChunk() {
+      if (!current.length) return;
+      chunks.push({ source: current.join('\n'), anchors: anchorMap });
+      current = [];
+      currentLength = 0;
+      anchorMap = Object.create(null);
+    }
+
+    lines.forEach(function (line) {
+      var fence = line.match(/^\s*(`{3,}|~{3,})/);
+      if (fence) {
+        var token = fence[1];
+        if (!insideFence) {
+          insideFence = true;
+          fenceChar = token.charAt(0);
+          fenceLength = token.length;
+        } else if (token.charAt(0) === fenceChar && token.length >= fenceLength) {
+          insideFence = false;
+          fenceChar = '';
+          fenceLength = 0;
+        }
+        current.push(line);
+        currentLength += line.length + 1;
+        return;
+      }
+      if (insideFence) {
+        current.push(line);
+        currentLength += line.length + 1;
+        return;
+      }
+
+      // Match the normal reader's treatment: the book title is already displayed in the page hero.
+      if (!skippedBookTitle && /^\s*#\s+/.test(line)) {
+        skippedBookTitle = true;
+        return;
+      }
+
+      // Raw HTML is intentionally disabled in MarkdownIt. Convert standalone anchor declarations
+      // to placeholders, then replace those placeholders with safe, empty spans after rendering.
+      var anchor = line.match(/^\s*<a\s+id=["']([^"']+)["']\s*>\s*<\/a>\s*$/i);
+      if (anchor) {
+        var anchorId = anchor[1];
+        if (seenAnchorIds[anchorId]) return; // duplicate id anchors add no value and can break navigation
+        seenAnchorIds[anchorId] = true;
+        var placeholder = 'FIELD_BOOK_ANCHOR_' + (nextAnchor++) + '__';
+        anchorMap[placeholder] = anchorId;
+        line = placeholder;
+      }
+
+      var heading = line.match(/^\s*(#{1,6})\s+/);
+      if (heading && currentLength > 0 && (heading[1].length === 1 || currentLength >= maxChunkLength)) {
+        pushChunk();
+      }
+      current.push(line);
+      currentLength += line.length + 1;
+    });
+    pushChunk();
+    return chunks;
+  }
+
+  function replaceBookAnchorPlaceholders(rendered, anchorMap) {
+    return rendered.replace(/FIELD_BOOK_ANCHOR_\d+__/g, function (placeholder) {
+      if (!Object.prototype.hasOwnProperty.call(anchorMap, placeholder)) return '';
+      return '<span id="' + F.esc(anchorMap[placeholder]) + '"></span>';
+    });
+  }
+
+  var pendingFullBookHash = '';
+  content.addEventListener('click', function (event) {
+    if (!chapter || chapter.kind !== 'full-book') return;
+    var link = event.target.closest('a[href^="#"]');
+    if (!link) return;
+    var targetId;
+    try { targetId = decodeURIComponent(link.getAttribute('href').slice(1)); }
+    catch (error) { targetId = link.getAttribute('href').slice(1); }
+    if (!targetId || document.getElementById(targetId)) return;
+    event.preventDefault();
+    pendingFullBookHash = targetId;
+    try { history.replaceState(null, '', location.pathname + location.search + '#' + encodeURIComponent(targetId)); } catch (error) { /* non-fatal */ }
+  });
+
+  function tryPendingFullBookHash() {
+    if (!pendingFullBookHash) return;
+    var target = document.getElementById(pendingFullBookHash);
+    if (!target) return;
+    pendingFullBookHash = '';
+    target.scrollIntoView({ behavior: F.scrollBehavior(), block: 'start' });
+  }
+
+  function loadFullBookMarkdown() {
+    fullBookLoading = true;
+    content.innerHTML = '<p>Loading the complete book…</p>';
+    outline.innerHTML = '<span class="outline-placeholder">Preparing the book outline…</span>';
+    var markdownPromise = fetch(chapter.file).then(function (response) {
+      if (!response.ok) throw Error('Could not fetch the book Markdown');
+      return response.text();
+    });
+    // Start the renderer download at the same time as the Markdown request rather than waiting for it.
+    return Promise.all([markdownPromise, loadMarkdownRenderer()]).then(function (results) {
+      if (!window.markdownit) throw Error('Markdown renderer unavailable');
+      var chunks = prepareFullBookChunks(results[0]);
+      var renderer = window.markdownit({ html: false, typographer: false, breaks: false });
+      var index = 0;
+      content.innerHTML = '';
+
+      function renderNextChunk() {
+        if (index >= chunks.length) {
+          fullBookLoading = false;
+          prepareContentLinks();
+          prepareContentStructure();
+          offerResume();
+          makeOutline();
+          updateProgress();
+          applySearchContext();
+          tryPendingFullBookHash();
+          return;
+        }
+        var chunk = chunks[index++];
+        var rendered = replaceBookAnchorPlaceholders(renderer.render(chunk.source), chunk.anchors);
+        content.insertAdjacentHTML('beforeend', rendered);
+        tryPendingFullBookHash();
+        if (index < chunks.length) window.requestAnimationFrame(renderNextChunk);
+        else renderNextChunk();
+      }
+      renderNextChunk();
+    }).catch(function () {
+      fullBookLoading = false;
+      var error = F.$('#content-error');
+      error.hidden = false;
+      error.innerHTML = 'The complete book could not be loaded. <a href="' + F.esc(chapter.file) + '" target="_blank" rel="noopener">Open the Markdown source</a>.';
+      content.innerHTML = '';
+    });
+  }
+
   function loadChapterContent() {
+    // Full books use small pre-rendered chunks, not one enormous JavaScript HTML string.
+    if (chapter.kind === 'full-book' && Array.isArray(chapter.contentParts) && chapter.contentParts.length) {
+      loadChunkedFullBook();
+      return;
+    }
+    // Compatibility path for older catalogues that have not yet been rebuilt with contentParts.
+    if (chapter.kind === 'full-book' && location.protocol !== 'file:') {
+      loadFullBookMarkdown();
+      return;
+    }
     // If this content was already loaded on the current document, use it.
     if (window.FIELD_CHAPTER_HTML && typeof window.FIELD_CHAPTER_HTML[chapter.id] === 'string') {
       finishRender(window.FIELD_CHAPTER_HTML[chapter.id]);
@@ -381,8 +703,18 @@
     F.writeJSON(LAST_READ_KEY, { id: chapter.id, title: chapter.title, book: book.title, url: chapter.readUrl, label: chapter.label, openedAt: Date.now() });
     F.$('#reader-title').textContent = chapter.title;
     F.$('#reader-title-small').textContent = chapter.title;
-    F.$('#reader-num').textContent = 'CHAPTER ' + chapter.label;
-    F.$('#reader-hero-num').textContent = 'CHAPTER ' + chapter.label;
+    var readerItemType = chapter.kind === 'full-book' ? 'BOOK' : 'CHAPTER';
+    F.$('#reader-num').textContent = chapter.kind === 'full-book' ? 'COMPLETE BOOK' : 'CHAPTER ' + chapter.label;
+    F.$('#reader-hero-num').textContent = readerItemType === 'BOOK' ? 'BOOK' : 'CHAPTER ' + chapter.label;
+    if (chapter.kind === 'full-book') {
+      F.$('.reader-actions').setAttribute('aria-label', 'Book actions');
+      F.$('.reader-rail').setAttribute('aria-label', 'Book tools');
+      F.$('#bookmark-chapter').title = 'Save this book to your study list';
+      F.$('#copy-chapter-link').title = 'Share or copy book link';
+      F.$('#print-chapter').title = 'Print this book';
+      var jumpLabel = document.querySelector('label[for="chapter-select"]');
+      if (jumpLabel) jumpLabel.textContent = 'Jump to a chapter or the complete book';
+    }
     F.$('#reader-volume-label').textContent = 'VOLUME / ' + String(book.id).padStart(2, '0');
     F.$('#reader-byline').textContent = book.title + ' · ' + Number(chapter.words || 0).toLocaleString() + ' words · ' + Math.max(1, Math.round((chapter.words || 0) / READING_WPM)) + ' min read';
     F.$('#crumb-book').textContent = book.title;

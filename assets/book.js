@@ -20,7 +20,8 @@
   }
 
   function renderHeader(book) {
-    var words = book.chapters.reduce(function (sum, chapter) { return sum + chapter.words; }, 0);
+    var regularChapters = book.chapters.filter(function (chapter) { return chapter.kind !== 'full-book'; });
+    var words = regularChapters.reduce(function (sum, chapter) { return sum + chapter.words; }, 0);
     document.title = book.title + ' — The Product Field';
     if (window.FieldParticles) window.FieldParticles.setVolume(book.id);   // bring this volume's constellation forward
     F.$('#book-companions').hidden = book.id !== 3;
@@ -28,7 +29,7 @@
     F.$('#book-title').textContent = book.title;
     F.$('#book-subtitle').textContent = book.subtitle;
     F.$('#book-stats').innerHTML =
-      '<div class="book-stat"><b>' + pad2(book.chapters.length) + '</b><span>CHAPTERS</span></div>' +
+      '<div class="book-stat"><b>' + pad2(regularChapters.length) + '</b><span>CHAPTERS</span></div>' +
       '<div class="book-stat"><b>' + Math.round(words / 1000) + 'k</b><span>WORDS</span></div>';
   }
 
@@ -36,7 +37,7 @@
     var read = F.isRead(chapter.id);
     var status = audio[chapter.id] ? '♫ AUDIO' : (read ? '✓' : '');
     return '<a class="chapter-row" href="' + F.esc(chapter.readUrl) + '">' +
-      '<span class="chapter-row-number">' + F.esc(chapter.label) + '</span>' +
+      '<span class="chapter-row-number">' + F.esc(chapter.kind === 'full-book' ? 'BOOK' : chapter.label) + '</span>' +
       '<span class="chapter-row-title">' + F.esc(chapter.title) + '</span>' +
       '<span class="chapter-row-meta">' + (read ? 'READ' : 'OPEN') + '<span class="audio-mark">' + status + '</span></span></a>';
   }

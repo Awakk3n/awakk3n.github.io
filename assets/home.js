@@ -26,7 +26,7 @@
 
   /* ---- Header counters ---- */
   function syncCounts() {
-    var total = books.reduce(function (sum, book) { return sum + book.chapters.length; }, 0);
+    var total = books.reduce(function (sum, book) { return sum + book.chapters.filter(function (chapter) { return chapter.kind !== 'full-book'; }).length; }, 0);
     var all = F.$('#all-chapter-count');
     if (all) all.textContent = total;
     var rail = F.$('#archive-total');
@@ -34,8 +34,9 @@
     F.$$('[data-book-count]').forEach(function (node) {
       var book = books.filter(function (b) { return String(b.id) === node.getAttribute('data-book-count'); })[0];
       if (!book) return;
-      var read = book.chapters.filter(function (c) { return F.isRead(c.id); }).length;
-      node.textContent = pad2(book.chapters.length) + ' CH' + (read ? ' · ' + read + ' READ' : '');
+      var regularChapters = book.chapters.filter(function (c) { return c.kind !== 'full-book'; });
+      var read = regularChapters.filter(function (c) { return F.isRead(c.id); }).length;
+      node.textContent = pad2(regularChapters.length) + ' CH' + (read ? ' · ' + read + ' READ' : '');
     });
   }
 
@@ -47,9 +48,10 @@
   }
 
   function bookBlock(book, matches, term) {
-    var words = book.chapters.reduce(function (sum, c) { return sum + c.words; }, 0);
-    var audioCount = book.chapters.filter(function (c) { return !!audio[c.id]; }).length;
-    var previews = term ? matches.slice(0, MATCH_PREVIEW) : book.chapters.slice(0, DEFAULT_PREVIEW);
+    var regularChapters = book.chapters.filter(function (c) { return c.kind !== 'full-book'; });
+    var words = regularChapters.reduce(function (sum, c) { return sum + c.words; }, 0);
+    var audioCount = regularChapters.filter(function (c) { return !!audio[c.id]; }).length;
+    var previews = term ? matches.slice(0, MATCH_PREVIEW) : regularChapters.slice(0, DEFAULT_PREVIEW);
     var more = term && matches.length > MATCH_PREVIEW
       ? '<div class="book-side-label book-side-more">+' + (matches.length - MATCH_PREVIEW) + ' MORE MATCHES</div>' : '';
     var href = 'book.html?b=' + book.id;
@@ -61,7 +63,7 @@
         '<h3 class="book-title"><a href="' + href + '">' + F.esc(book.title) + '</a></h3>' +
         '<p class="book-subtitle">' + F.esc(book.subtitle) + '</p>' +
         '<p class="book-description">' + F.esc(book.description) + '</p>' +
-        '<div class="book-meta"><span><b>' + pad2(book.chapters.length) + '</b> chapters</span>' +
+        '<div class="book-meta"><span><b>' + pad2(regularChapters.length) + '</b> chapters</span>' +
           '<span><b>' + Math.round(words / 1000) + 'k</b> words (approx.)</span>' +
           (audioCount ? '<span><b>' + audioCount + '</b> audio companions</span>' : '') + '</div>' +
         '<a class="book-open" href="' + href + '">OPEN VOLUME INDEX</a>' +
@@ -77,7 +79,7 @@
 
     books.filter(function (book) { return activeFilter === 'all' || String(book.id) === activeFilter; })
       .forEach(function (book) {
-        var matches = book.chapters.filter(function (chapter) { return matchesTerm(chapter, term); });
+        var matches = book.chapters.filter(function (chapter) { return chapter.kind !== 'full-book' && matchesTerm(chapter, term); });
         if (!matches.length) return;
         shown++;
         totalMatches += matches.length;
@@ -92,12 +94,12 @@
     list.innerHTML = html;
     status.textContent = term
       ? plural(totalMatches, 'chapter') + ' match “' + searchInput.value.trim() + '” across ' + plural(shown, 'volume') + '.'
-      : 'Showing ' + totalMatches + ' chapters across ' + plural(shown, 'volume') + ' · ' + F.allChapters(books).filter(function (c) { return F.isRead(c.id); }).length + ' read';
+      : 'Showing ' + totalMatches + ' chapters across ' + plural(shown, 'volume') + ' · ' + F.allChapters(books).filter(function (c) { return c.kind !== 'full-book' && F.isRead(c.id); }).length + ' read';
   }
 
   var randomButton = F.$('#random-chapter');
   if (randomButton) randomButton.addEventListener('click', function () {      // a random chapter you have not read yet (any chapter once everything is read)
-    var all = F.allChapters(books), unread = all.filter(function (c) { return !F.isRead(c.id); }), pool = unread.length ? unread : all;
+    var all = F.allChapters(books).filter(function (c) { return c.kind !== 'full-book'; }), unread = all.filter(function (c) { return !F.isRead(c.id); }), pool = unread.length ? unread : all;
     if (pool.length) window.location.href = pool[Math.floor(Math.random() * pool.length)].readUrl;
   });
 
