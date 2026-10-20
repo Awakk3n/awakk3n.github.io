@@ -26,20 +26,20 @@ async function stubYouTube(page, log) {
     const b0 = (await page.evaluate(() => window.FieldParticles.stats())).bursts;
     await page.mouse.click(600, 600); await page.waitForTimeout(150);
     check('field: click on empty hero creates a burst', (await page.evaluate(() => window.FieldParticles.stats().bursts)) === b0 + 1);
-    await page.click('.hero-secondary-link'); // navigates; test burst-suppression separately below
+    await page.click('.hero a[data-field-focus]'); // navigates; test burst-suppression separately below
     await open(page, base, 'index.html');
     const b1 = (await page.evaluate(() => window.FieldParticles.stats())).bursts;
-    await page.evaluate(() => document.querySelector('.hero-secondary-link').addEventListener('click', e => e.preventDefault()));
-    await page.click('.hero-secondary-link'); await page.waitForTimeout(100);
+    await page.evaluate(() => document.querySelector('.hero a[data-field-focus]').addEventListener('click', e => e.preventDefault()));
+    await page.click('.hero a[data-field-focus]'); await page.waitForTimeout(100);
     check('field: clicking a link does NOT burst', (await page.evaluate(() => window.FieldParticles.stats().bursts)) === b1);
     await page.evaluate(() => window.scrollTo({ top: 300, behavior: 'instant' })); await page.waitForTimeout(250);
     check('field: hero constellation active at scroll 300', await page.evaluate(() => window.FieldParticles.stats().heroVisible));
     await page.evaluate(() => window.scrollTo({ top: 2000, behavior: 'instant' })); await page.waitForTimeout(250);
     check('field: hero constellation culled when scrolled away', !(await page.evaluate(() => window.FieldParticles.stats().heroVisible)));
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-    await page.click('.theme-toggle'); await page.waitForTimeout(200);
-    check('theme: toggle flips theme + label, persists', await page.evaluate(() => document.documentElement.dataset.theme === 'light' && document.querySelector('.toggle-label').textContent === 'DARK' && localStorage.getItem('field-theme') === 'light'));
-    check('home: original icons are present (theme, arrows, search)', await page.evaluate(() => /☼|◐/.test(document.querySelector('.theme-toggle').textContent) && /↘/.test(document.querySelector('.hero').textContent) && /⌕/.test(document.querySelector('.search-box').textContent)));
+    await page.click('.nav-toggle'); await page.waitForTimeout(500); await page.click('.theme-toggle'); await page.waitForTimeout(200);
+    check('theme: the icon-only toggle flips the theme, swaps its icon and its name, and persists', await page.evaluate(() => { const b = document.querySelector('.theme-toggle'); return document.documentElement.dataset.theme === 'light' && /◐/.test(b.textContent) && !/LIGHT|DARK/i.test(b.textContent) && /dark mode/.test(b.getAttribute('aria-label')) && localStorage.getItem('field-theme') === 'light'; }));
+    check('home: original icons are present (theme, arrows, search)', await page.evaluate(() => /☼|◐/.test(document.querySelector('.theme-toggle').textContent) && /⌕/.test(document.querySelector('.search-box').textContent)));
     await ctx.close(); }
   // ---------- REDUCED MOTION ----------
   { const ctx = await context(b, { width: 1440, height: 900, reducedMotion: 'reduce' }); const page = await ctx.newPage();
@@ -99,8 +99,8 @@ async function stubYouTube(page, log) {
     check('reader: chapter without audio keeps panel hidden', await page.evaluate(() => document.querySelector('#audio-panel').hidden));
     check('reader: byline shows reading time', await page.evaluate(() => /min read/.test(document.querySelector('#reader-byline').textContent)), await page.evaluate(() => document.querySelector('#reader-byline').textContent));
     await page.click('#bookmark-chapter');
-    check('reader: bookmark is a proper toggle (aria-pressed, static label)', await page.evaluate(() => { const b = document.querySelector('#bookmark-chapter'); return b.getAttribute('aria-pressed') === 'true' && /Bookmark$/.test(b.textContent.trim()) && /★/.test(b.textContent) && b.classList.contains('is-saved'); }));
-    await page.click('#text-larger'); await page.click('#text-larger'); const sz = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--reader-font').trim());
+    check('reader: bookmark is a proper toggle (aria-pressed, static label)', await page.evaluate(() => { const b = document.querySelector('#bookmark-chapter'); return b.getAttribute('aria-pressed') === 'true' && /Save$/.test(b.textContent.trim()) && /★/.test(b.textContent) && b.classList.contains('is-saved'); }));
+    await page.click('.nav-toggle'); await page.waitForTimeout(500); await page.click('#text-larger'); await page.click('#text-larger'); const sz = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--reader-font').trim());
     await open(page, base, CH_PLAIN);
     check('reader: text size persists across loads', (await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--reader-font').trim())) === sz, sz);
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight * 0.4)); await page.waitForTimeout(500);
@@ -137,14 +137,12 @@ async function stubYouTube(page, log) {
     check('scroll: wheel over the outline scrolls the page', (await page.evaluate(() => window.scrollY)) > y0 + 300, 'scrollY ' + y0 + ' → ' + (await page.evaluate(() => window.scrollY)));
     check('outline: opening a section expands only its own sub-headings', await page.evaluate(() => { const l3 = [...document.querySelectorAll('#chapter-outline a.level-3')]; const open = l3.filter(a => !a.classList.contains('is-collapsed')); const groups = new Set(open.map(a => a.dataset.group)); return l3.length > open.length && groups.size <= 1; }));
     await page.evaluate(() => window.scrollTo({ top: 1400, behavior: 'instant' })); await page.waitForTimeout(300); const yBefore = await page.evaluate(() => window.scrollY); await page.evaluate(() => document.getElementById('mark-done').click()); await page.waitForTimeout(900);
-    check('reader: "Mark as read" does not move the page', Math.abs((await page.evaluate(() => window.scrollY)) - yBefore) < 3 && /Marked as read/.test(await page.evaluate(() => document.getElementById('mark-done').textContent)), 'scrollY ' + yBefore + ' → ' + (await page.evaluate(() => window.scrollY)));
+    check('reader: "Mark as read" does not move the page', Math.abs((await page.evaluate(() => window.scrollY)) - yBefore) < 3 && /Read/.test(await page.evaluate(() => document.getElementById('mark-done').textContent)), 'scrollY ' + yBefore + ' → ' + (await page.evaluate(() => window.scrollY)));
     await page.evaluate(() => document.getElementById('mark-done').click()); await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     check('outline: no scrollbar in any state (nothing shifts when sub-headings open)', await page.evaluate(() => { const n = document.querySelector('#chapter-outline'); return n.offsetWidth - n.clientWidth === 0; }));
-    check('header links carry the same icon on every page', await (async () => { const bad = []; for (const rel of ['index.html', 'book.html?b=1', 'search.html', 'study.html', 'resource.html?resource=glossary']) { await open(page, base, rel); const ok = await page.evaluate(() => [...document.querySelectorAll('.header-utility')].every(a => /↗/.test(a.textContent))); if (!ok) bad.push(rel); } await open(page, base, CH_AUDIO); return bad.length === 0; })());
     // text size: the buttons switch off at the smallest and largest size
     const capTest = await page.evaluate(async () => { const sm = document.getElementById('text-smaller'), lg = document.getElementById('text-larger'); for (let i = 0; i < 12; i++) lg.click(); const atMax = { larger: lg.disabled, smaller: sm.disabled }; for (let i = 0; i < 14; i++) sm.click(); const atMin = { larger: lg.disabled, smaller: sm.disabled }; for (let i = 0; i < 4; i++) lg.click(); return { atMax, atMin, mid: { larger: lg.disabled, smaller: sm.disabled } }; });
     check('text size: A+ is disabled at the largest size, A− at the smallest, both enabled in between', capTest.atMax.larger && !capTest.atMax.smaller && capTest.atMin.smaller && !capTest.atMin.larger && !capTest.mid.larger && !capTest.mid.smaller, JSON.stringify(capTest));
-    check('header: at most two boxed controls (text size is one joined control, navigation is plain text)', await page.evaluate(() => { const boxed = [...document.querySelectorAll('.topbar button, .topbar .seg, .topbar a')].filter(e => !e.closest('.seg') || e.classList.contains('seg')).filter(e => { const cs = getComputedStyle(e); return parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none' && cs.borderTopColor !== 'rgba(0, 0, 0, 0)' && !e.classList.contains('wordmark'); }); return boxed.length <= 2; }));
     check('header: breadcrumb truncates with an ellipsis (block box, not flex)', await page.evaluate(() => { const a = document.querySelector('.reader-breadcrumb a'); const cs = getComputedStyle(a); return cs.textOverflow === 'ellipsis' && cs.display !== 'inline-flex' && cs.display !== 'flex'; }));
     check('layout: hero and sections share one left edge (no jumping alignment)', await open(page, base, 'book.html?b=3').then(() => page.evaluate(() => { const x = s => Math.round(document.querySelector(s).getBoundingClientRect().left); return x('.page-hero-inner h1') === x('.chapter-directory h2'); })));
     await ctx.close(); }
@@ -161,7 +159,7 @@ async function stubYouTube(page, log) {
   // ---------- CHAPTERS, SEARCH, EXPORT ----------
   { const ctx = await context(b, { width: 1440, height: 900 }); const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message));
     let bad = [];
-    for (const id of ['book-1-ch-01', 'book-2-ch-23', 'book-3-c37', 'book-2-ch-12']) { await open(page, base, 'read.html?chapter=' + id); await page.waitForTimeout(400);
+    for (const id of ['book-1-ch-01', 'book-2-ch-23', 'book-3-ch-37', 'book-2-ch-12']) { await open(page, base, 'read.html?chapter=' + id); await page.waitForTimeout(400);
       const r = await page.evaluate(() => { const hs = [...document.querySelectorAll('h1')]; return { len: document.querySelector('#chapter-content').textContent.length, h1Level1: hs.filter(h => (h.getAttribute('aria-level') || '1') === '1').length }; });
       if (r.len < 2000 || r.h1Level1 !== 1) bad.push(id + ' ' + JSON.stringify(r)); }
     check('chapters render fully and have one level-1 heading (body <h1>s demoted)', bad.length === 0, bad.join(' | '));

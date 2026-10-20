@@ -9,7 +9,15 @@
     "test:a11y": "node axe-audit.js http://localhost:8080 axe.json",
     "test:audio-size": "node audio-size.js http://localhost:8080",
     "bench": "node particle-bench.js http://localhost:8080 run index.html 1,4",
-    "lighthouse": "node lighthouse.mjs http://localhost:8080 run index.html"
+    "lighthouse": "node lighthouse.mjs http://localhost:8080 run index.html",
+    "test:behaviour": "node behaviour.js http://localhost:8802",
+    "test:narrow": "node narrow.js http://localhost:8802",
+    "test:links": "node check-links.js"
   },
-  "devDependencies": { "axe-core": "^4.10.0", "chrome-launcher": "^1.1.0", "lighthouse": "^12.0.0", "playwright": "^1.50.0" }
+  "devDependencies": {
+    "axe-core": "^4.10.0",
+    "chrome-launcher": "^1.1.0",
+    "lighthouse": "^12.0.0",
+    "playwright": "^1.50.0"
+  }
 }

@@ -16,7 +16,7 @@ async function context(browser, o) {
 }
 
 const CH_AUDIO = 'read.html?chapter=book-1-ch-03';   // has an audio mapping
-const CH_PLAIN = 'read.html?chapter=book-3-c13';     // long, no audio
+const CH_PLAIN = 'read.html?chapter=book-3-ch-13';     // long, no audio
 
 const PAGES = [
   ['home', 'index.html'],
