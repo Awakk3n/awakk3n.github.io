@@ -136,7 +136,7 @@
     var heading = element('h2', 'audio-title', 'Listen to this chapter');
     heading.id = titleId;
     copy.appendChild(heading);
-    copy.appendChild(element('p', 'audio-note', 'This audiobook has been created by Gemini Notebooklm using the content of this chapter.'));
+    copy.appendChild(element('p', 'audio-note', 'This audiobook has been created using Gemini Notebooklm.'));
 
     var actions = element('div', 'audio-actions');
     var playButton = element('button', 'button button-bright audio-play');
