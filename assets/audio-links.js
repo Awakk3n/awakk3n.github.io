@@ -10,3 +10,4 @@
  */
 window.FIELD_AUDIO_LINKS = window.FIELD_AUDIO_LINKS || {};
 window.FIELD_AUDIO_LINKS["book-1-ch-03"] = "https://www.youtube.com/watch?v=hUQKMW90YQk&list=PLc1KzrqfBoGs";
+window.FIELD_AUDIO_LINKS["book-1-ch-04"] = "https://www.youtube.com/watch?v=hUQKMW90YQk&list=PLc1KzrqfBoGs";
