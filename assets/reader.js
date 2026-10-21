@@ -55,7 +55,7 @@
       shownDone = done;
       doneButton.classList.toggle('done', done);
       doneButton.setAttribute('aria-pressed', done ? 'true' : 'false');
-      doneButton.innerHTML = done ? '<span aria-hidden="true">✓</span><span>Marked Read</span>' : '<span aria-hidden="true">○</span><span>Mark read</span>';
+      doneButton.innerHTML = done ? '<span aria-hidden="true">✓</span><span>Read</span>' : '<span aria-hidden="true">○</span><span>Unread</span>';
     }
   }
 
